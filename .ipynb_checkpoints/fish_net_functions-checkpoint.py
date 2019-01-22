@@ -195,7 +195,7 @@ def fish_net_peaks(dat, cnt = 95, typ = 'std', stdlim = 3):
             p   = np.where(d > stdlim*sem)[0]
         else: print('Don''t know what type of binarisation to use')
         
-        for pi in p: pks[i,p] = 1
+        pks[i,p] = 1
             
         
     
