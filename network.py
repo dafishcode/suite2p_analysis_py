@@ -6,6 +6,9 @@ def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering o
 # mcc = mean cells per cluster
 #each plane is clustered separately
 
+
+#TEST
+
     import numpy as np
     import os
     from sklearn.cluster import KMeans

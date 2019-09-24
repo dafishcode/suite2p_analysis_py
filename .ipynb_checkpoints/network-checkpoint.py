@@ -6,6 +6,9 @@ def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering o
 # mcc = mean cells per cluster
 #each plane is clustered separately
 
+
+#TEST
+
     import numpy as np
     import os
     from sklearn.cluster import KMeans
@@ -23,6 +26,12 @@ def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering o
         klist[y] = kcoordcs
         np.save(Fdrop + 'Project/' + experiment + os.sep + coordlist[y][:coordlist[y].find('run')+6] + '_' + 'kcoord.npy', kcoordcs)
     return(klist)
+    
+#=======================================================================
+def funck(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering on cell coordinates 
+#======================================================================= 
+    
+
     
 #=======================================================================
 def average(Fdrop, experiment, tracelist, coordlist): 
