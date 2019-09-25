@@ -17,11 +17,13 @@ def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering o
     klist = list(range(len(coordlist)))
     for y in range(len(coordlist)):
         print('Clustering fish ' + str(y + 1)+ ' of ' + str(len(coordlist)))
-    # Pull out coordinates and loop through each plane
+    # Pull out coordinates and loop through each plane 
         kvector = []
-        cs = np.load(Fdrop + 'Project/' + experiment + os.sep + coordlist[y][:,:3])
+        cs = np.load(Fdrop + 'Project/' + experiment + os.sep + coordlist[y])[:,:3]
+        spatial_conversion = [.5, .5, 15]
+        spacecs = np.multiply(cs, spatial_conversion)
         n_clust  = int(cs.shape[0]/mcc) #how many clusters to make
-        kmeans   = KMeans(n_clusters=n_clust, random_state=0).fit(cs[:,:2])  #perform k means on all cells
+        kmeans   = KMeans(n_clusters=n_clust, random_state=0).fit(spacecs)  #perform k means on all cells
         kvector =  np.append(kvector, kmeans.labels_) #vector of all label values
         kcoordcs = np.column_stack((cs, kvector)) #array for new coordinates including spatial clusters
         klist[y] = kcoordcs
@@ -57,22 +59,13 @@ def average(Fdrop, experiment, tracelist, coordlist):
 #======================================================================= 
     import numpy as np
     import os
-    
-    
-    
-    
-    
-    
-    
-    
-    
     meantracelist = list(range(len(coordlist)))
     meanloclist = list(range(len(coordlist)))
     for y in range(len(coordlist)):
         print('Calculating fish ' + str(y + 1)+ ' of ' + str(len(coordlist)))
         trace = np.load(tracelist[y]) #trace for each cell
         loc = np.load(coordlist[y])[:,:3] #cell coordinates
-        label  = np.load(coordlist[y])[:,3] #cluster labels
+        label  = np.load(coordlist[y])[:,np.load(coordlist[y]).shape[1]-1] #cluster labels
     
         labels = np.unique(label) #unique cluster labels
         count     = 0 
@@ -130,3 +123,9 @@ def divconq(kcoord, i, Fdrop, experiment, kcoordinput, kread):   # K-labels, coo
         nkl = divconq(kcoord, i, Fdrop, experiment, kcoordinput, kcoordnew) #iterate over all remaining clusters until no cluster distance > 100
     print('Clustered fish ' + str(i + 1)+ ' of ' + str(len(kcoord)))
     return(nkl)
+
+
+
+#ANALYSIS
+#------------
+#------------
