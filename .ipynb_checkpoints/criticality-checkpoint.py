@@ -50,7 +50,7 @@ def neighbour(Fdrop, experiment, coordlist, rng, dim, cnt): # Select which fish 
     #Loop through all fish
     #----------------------
     for i in range(len(coordlist)):
-        coord = np.load(coordlist[i])
+        coord = np.load(coordlist[i])[:,:3]
         
         # Set up nearest neighbour graph
         #---------------------------------------------------------------------------
