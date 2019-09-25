@@ -1,3 +1,7 @@
+#PROCESS
+#------------
+#------------
+
 #=======================================================================
 def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering on cell coordinates 
 #======================================================================= 
@@ -5,9 +9,6 @@ def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering o
 # It then performs clustering to pull out spatially contiguous groups of cells  
 # mcc = mean cells per cluster
 #each plane is clustered separately
-
-
-#TEST
 
     import numpy as np
     import os
@@ -18,19 +19,37 @@ def spacek(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering o
         print('Clustering fish ' + str(y + 1)+ ' of ' + str(len(coordlist)))
     # Pull out coordinates and loop through each plane
         kvector = []
-        cs = np.load(Fdrop + 'Project/' + experiment + os.sep + coordlist[y])
+        cs = np.load(Fdrop + 'Project/' + experiment + os.sep + coordlist[y][:,:3])
         n_clust  = int(cs.shape[0]/mcc) #how many clusters to make
         kmeans   = KMeans(n_clusters=n_clust, random_state=0).fit(cs[:,:2])  #perform k means on all cells
         kvector =  np.append(kvector, kmeans.labels_) #vector of all label values
         kcoordcs = np.column_stack((cs, kvector)) #array for new coordinates including spatial clusters
         klist[y] = kcoordcs
-        np.save(Fdrop + 'Project/' + experiment + os.sep + coordlist[y][:coordlist[y].find('run')+6] + '_' + 'kcoord.npy', kcoordcs)
+        np.save(Fdrop + 'Project/' + experiment + os.sep + coordlist[y][:coordlist[y].find('run')+6] + '_' + 'realcoord.npy', kcoordcs)
     return(klist)
-    
+
 #=======================================================================
-def funck(coordlist, Fdrop, experiment, mcc):    # Spatial K-means clustering on cell coordinates 
+def funck(Fdrop, experiment, ktrace, kcoord):    # K-means clustering on correlation matrix
 #======================================================================= 
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import copy
+    from sklearn.cluster import KMeans
+    import os
     
+    #K means cluster correlation matrix
+    kcoordlist = list(range(len(ktrace)))
+    for y in range(len(ktrace)):
+        print('Clustering fish ' + str(y + 1)+ ' of ' + str(len(ktrace)))
+        corr = np.corrcoef(np.load(ktrace[y])) 
+        coord = np.load(kcoord[y])[:,:3]
+        kmeans = KMeans(n_clusters=100, random_state=0).fit(corr)
+        klabel = kmeans.labels_
+        kcoordnew = np.column_stack((coord,klabel)) #add labels to original kcoord array
+        kcoordlist[y] = kcoordnew
+        np.save(Fdrop + 'Project/' + experiment + os.sep + kcoord[y][:kcoord[y].find('run')+6] + '_' + 'kcoord.npy', kcoordnew)
+    return(kcoordlist)
+
 
     
 #=======================================================================
@@ -38,6 +57,14 @@ def average(Fdrop, experiment, tracelist, coordlist):
 #======================================================================= 
     import numpy as np
     import os
+    
+    
+    
+    
+    
+    
+    
+    
     
     meantracelist = list(range(len(coordlist)))
     meanloclist = list(range(len(coordlist)))
@@ -68,36 +95,38 @@ def average(Fdrop, experiment, tracelist, coordlist):
 
 
 #======================================================================= 
-def divconq(kl, cs):   # K-labels, coordinates
+def divconq(kcoord, i, Fdrop, experiment, kcoordinput, kread):   # K-labels, coordinates
 #======================================================================= 
+    import copy
     import numpy as np
     import matplotlib.pyplot as plt
     import copy
-    import fish_net_functions as fn
     from sklearn.cluster import KMeans
     
-    kls = np.unique(kl)
-    mxdia = []
-    for k in kls:
-        kid    = np.where(kl == k)[0]
-        mxd    = np.max(cs[kid,:] - np.mean(cs[kid,:], axis=0))
-        mxdia  = np.append(mxdia, mxd)
+    cluscoord = kread[:,:3] #spatial cluster coordinates
+    kl = kread[:,3] #functional labels of spatial clusters
+    kls = np.unique(kl) #unique functional label
         
-    toolongs = np.where(mxdia > 100)[0]
-    
-    if toolongs.shape[0] == 0:     
-        return kl
-    
-    else:  
-        nkc = np.max(kls)
-        nkl = copy.deepcopy(kl)
-        for kcheck in toolongs:
-            okc = kcheck
-            nkc = nkc + 1          # new counter
+    mxdia = [] #max distance of s-cluster from its assigned f-cluster for all clusters
+    for k in kls: #loop through unique label values
+        kid    = np.where(kl == k)[0] #indeces of current label values
+        mxd    = np.max(cluscoord[kid,:] - np.mean(cluscoord[kid,:], axis=0)) #max distance from mean of cluster
+        mxdia  = np.append(mxdia, mxd) 
+        
+    toolongs = np.where(mxdia > 100)[0] #returns the value for clusters which are outside distance threshold
 
-            kmembs   = np.where(kl == okc)[0]
-            kmeans   = KMeans(n_clusters=2, random_state=0).fit(cs[kmembs,:])
-            nkl[kmembs[np.where(kmeans.labels_ == 1)[0]]] = nkc 
-        
-        nkl = fn.fish_net_divconq(nkl,cs)
-        return nkl
+    if toolongs.shape[0] == 0:   #if no clusters are above this distance - keep functional labels as before   
+        return kl
+    else:  #if some cluster are above max distance
+        nkc = np.max(kls)     #max label value
+        nkl = copy.deepcopy(kl) #copy of kl
+        for kcheck in toolongs: #loop through each cluster > 100 in length
+            okc = kcheck #current 
+            nkc = nkc + 1          #iterate over cluster number max value
+            kmembs   = np.where(kl == okc)[0] # where functional label == current label loop
+            kmeans   = KMeans(n_clusters=2, random_state=0).fit(cluscoord[kmembs,:]) #repeat kmeans - and split into 2 smaller cluster
+            nkl[kmembs[np.where(kmeans.labels_ == 1)[0]]] = nkc #assign new cluster values
+            kcoordnew = np.column_stack((cluscoord,nkl))
+        nkl = divconq(kcoord, i, Fdrop, experiment, kcoordinput, kcoordnew) #iterate over all remaining clusters until no cluster distance > 100
+    print('Clustered fish ' + str(i + 1)+ ' of ' + str(len(kcoord)))
+    return(nkl)
