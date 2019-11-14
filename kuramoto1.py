@@ -44,7 +44,6 @@ class Kuramoto(object):
 
         self.noise = noise
 
-
     @property
     def noise(self):
         """Sets perturbations added to the system at each timestamp.
@@ -95,7 +94,6 @@ class Kuramoto(object):
             w -- iterable frequency
             k -- 3D coupling matrix, unless 1st order
             """
-
         w, k = arg
         yt = y[:,None]
         dy = y-yt
@@ -108,6 +106,10 @@ class Kuramoto(object):
 
         return phase
 
+    
+    
+    
+    
     def kuramoto_ODE_jac(self, t, y, arg):
         """Kuramoto's Jacobian passed for ODE solver."""
 
