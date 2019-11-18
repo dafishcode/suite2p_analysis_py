@@ -121,7 +121,7 @@ def hist(Fdrop, experiment, sublist, mode): # Select which fish data to visualis
 
         #binning for bln conditions
         for i in range(len(blnlist)):
-            countblnlist[i] = np.load(blnlist[i])
+            countblnlist[i] = np.load(sublist[i])
             blnmaxlist = max(map(lambda x: x, countblnlist[i]))
             blnminlist = min(map(lambda x: x, countblnlist[i]))
         blnmaxi = np.max(blnmaxlist)
