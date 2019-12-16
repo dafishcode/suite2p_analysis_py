@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
     
 
 #=================================================           
-def boxplot(Fdrop, experiment, figsave, plotlist, title):
+def boxplot(Fdrop, experiment, plotlist, title):
 #====================================================
     blnlist = list(range(np.int(len(plotlist)/3)))
     p5list = list(range(np.int(len(plotlist)/3)))
@@ -32,8 +32,6 @@ def boxplot(Fdrop, experiment, figsave, plotlist, title):
     plt.ylabel(title, size = 30, color = 'black')
     plt.xticks(np.arange(3), ('Baseline','PTZ 5mM', 'PTZ 20mM'), size = 15, color = 'black')
     plt.yticks(color = 'black')
-    os.chdir(figsave)
-    plt.savefig('loglik.png')
     #plt.show()
     #sns.reset_orig()
     #plt.style.use('dark_background')
