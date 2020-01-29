@@ -53,7 +53,7 @@ def neighbour(Fdrop, experiment, coordlist, rng, dim, cnt): # Select which fish 
 #------------
 #------------
 #=======================================================================
-def avalanche(nnb, bind, savepath, experiment): # duration = yes convergence (no back propagation, earliest avalanche consumes meeting avalanche, and later avalanche terminates), cells in t must be active in t+1)
+def avalanche1(nnblist, nnb, bind, savepath,experiment): # duration = yes convergence (no back propagation, earliest avalanche consumes meeting avalanche, and later avalanche terminates), cells in t must be active in t+1)
 #=======================================================================
     import numpy as np
     import os
@@ -75,7 +75,7 @@ def avalanche(nnb, bind, savepath, experiment): # duration = yes convergence (no
     #------------------------------
     #------------------------------
     for t in range(binarray.shape[1]-1): #loop through all time points
-        if i% round(10*binarray.shape[1]/100) == 0: print('doing time step ' + str(i) + 'of' + str(binarray.shape[1]) + 'for fish ' + str(y))
+        if i% round(10*binarray.shape[1]/100) == 0: print('doing time step ' + str(i) + 'of' + str(binarray.shape[1]) + 'for fish ') #+ str(y))
         i = i+1
         cid = np.where(binarray[:,t] > 0)[0]  #cid = cells active at current time point
     
@@ -177,8 +177,266 @@ def avalanche(nnb, bind, savepath, experiment): # duration = yes convergence (no
     avframescut = framesvec[[avsize >=3]]
     av = np.vstack((avsizecut, avframescut))      
     
-    np.save(savepath + 'Project/' + experiment + os.sep + binlist[y][:binlist[y].find('run')+7] + 'av.npy', av)
-    np.save(savepath + 'Project/' + experiment + os.sep + binlist[y][:binlist[y].find('run')+7] + 'pkg.npy', pkg)
+    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + '0.590bin0.10nnbav_shuffle.npy', av)
+    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + '0.590bin0.10nnbpkg_shuffle.npy', pkg)
+    return(avlist, pkglist)
+
+#=======================================================================
+def avalanche2(nnblist, nnb, bind, savepath,experiment): # duration = yes convergence (no back propagation, earliest avalanche consumes meeting avalanche, and later avalanche terminates), cells in t must be active in t+1)
+#=======================================================================
+    import numpy as np
+    import os
+    import itertools
+
+#Calculate avalanche size + duration
+#-----------------------------------
+    avlist = list(range(len(nnblist)))
+    pkglist = list(range(len(nnblist)))
+    binarray, oldav, firstav, realav, timemachine, convertav, fill, time = [],[],[],[],[],[],[],[]
+    
+    #LOOP THROUGH EACH FISH
+    #---------------------------------
+    #---------------------------------
+    binarray, nnbarray, pkg = np.load(bind),np.load(nnb), np.zeros(np.load(bind).shape)
+    i, marker, avcount = 0,0,0
+        
+    #LOOP THROUGH EACH TIME POINT
+    #------------------------------
+    #------------------------------
+    for t in range(binarray.shape[1]-1): #loop through all time points
+        if i% round(10*binarray.shape[1]/100) == 0: print('doing time step ' + str(i) + 'of' + str(binarray.shape[1]) + 'for fish ') #+ str(y))
+        i = i+1
+        cid = np.where(binarray[:,t] > 0)[0]  #cid = cells active at current time point
+    
+            
+        #LOOP THROUGH EACH ACTIVE CELL
+        #-------------------------------
+        #-------------------------------
+        for c in cid:            #loop through all active cells at this time point
+
+            if pkg[c,t] == 0:    #only find non-marked cells
+                if len(np.intersect1d(np.where(nnbarray[c,:] > 0)[0], cid) > 2): #if >2 neighbours active
+                    marker = marker + 1  
+                    pkg[c,t] = marker  #mark active non-marked cell with new marker value
+                       
+
+            #LOCATE ALL NEIGHBOURS
+            #----------------------------
+            #----------------------------
+            neighbour = np.where(nnbarray[c,:] > 0)[0]  #return indeces of current cell neighbours
+            neighbouron  = np.intersect1d(cid,neighbour) #indeces of active cells in t, and also neighbours of c
+            where0 = np.where(pkg[neighbouron,t] == 0)[0] #neighbours not already part of an avalanche
+                
+            #CONVERT NEIGHBOURS WHO ARE ALREADY PART OF AN AVALANCHE
+            #-------------------------------------------------------
+            #-------------------------------------------------------
+
+            if len(where0) < len(neighbouron): #if any cells are already part of another avalanche
+                oldav = np.unique(pkg[neighbouron, t]) #all avalanche values from neighbours
+                firstav = np.min(oldav[np.where(oldav > 0)])   #minimum avalanche value that is not 0
+                    
+                    #define which cells we want to combine
+                realav =  oldav[np.where(oldav > 0)] #all avalanche values that are not 0
+                uniteav = np.where(pkg[:,t]==realav[:,None])[1] #indeces of all cells that need to be connected
+                pkg[uniteav,t] = firstav #convert all current cell neighbours and their active neighbours 
+                pkg[c,t] = firstav #also convert current cell
+                    
+                #GO BACK IN TIME AND CONVERT
+                #----------------------------
+                #----------------------------
+                convertav = realav[1:] #avalanche numbers needing to be converted
+                if t < 30:
+                    time = t-1
+                
+                elif t>30:
+                    time = 30
+                        
+                for e in range(convertav.shape[0]):
+                    for timemachine in range(1, time): #loop through max possible time of previous avalanche
+                        fill = np.where(pkg[:,t-timemachine] == convertav[e])[0]
+                        if fill.shape[0] > 0:
+                            pkg[fill, t-timemachine] = firstav 
+                                    
+            #CONVERT NEIGHBOURS WHO ARE NOT PART OF AN AVALANCHE
+            #-------------------------------------------------------
+            #-------------------------------------------------------
+            if len(where0) == len(neighbouron): #if all cells are not part of an avalanche
+                pkg[neighbouron[where0],t] = pkg[c,t]  
+
+            
+        #SEE IF AVALANCHE CAN PROPAGATE TO NEXT TIME FRAME
+        #-------------------------------------------------------
+        #-------------------------------------------------------
+        n_av = np.unique(pkg[:,t])  #returns the marker values for each avalanche at this time point
+    
+        for n in n_av: #loop through each avalanche in this time point
+            if n > 0:
+                cgroup = np.where(pkg[:,t] == n)[0] #cells that are in same avalanche at t
+                cid2 = np.where(binarray[:,t+1] > 0) #cells in next time point that are active
+                intersect = np.intersect1d(cgroup, cid2) #check if any of the same cells are active in next time point
+                wherealso0 = np.where(pkg[intersect,t+1] == 0)[0] #here we find all cells that are active in both time frames, and that are not already part of another avalanche - and mark them as current avalanche
+                pkg[intersect[wherealso0], t+1] = pkg[cgroup[0],t] #carry over value to next frame for those cells
+      
+    allmark = np.unique(pkg)[1:] #all unique marker values
+
+    #CALCULATE AVALANCHE SIZE
+    #-------------------------------------------------------
+    #-------------------------------------------------------
+    avsize = np.unique(pkg, return_counts = True)[1][1:] #return counts for each unique avalanche
+    frameslist = np.zeros(avsize.shape[0]) #create empty frames list of same length
+
+    #CALCULATE AVALANCHE DURATION
+    #-------------------------------------------------------
+    #-------------------------------------------------------
+    avpertimelist = list(range(pkg.shape[1])) #empty list of length time frames
+
+    for e in range(pkg.shape[1]): #loop through each time point in pkg
+            avpertime = np.unique(pkg[:,e]) #unique marker value in each time point
+            avpertimelist[e] = avpertime #fill list of unique values in each time point
+                          
+    #link entire recording together
+    #-----------------------------------------------------------
+    linktime = list(itertools.chain(*avpertimelist)) #vector of all unique marker values in each time bin linked together
+    framesvec = np.unique(linktime, return_counts = True)[1][1:] #vector of number of frames for each consecutive avalanche
+
+    #COMBINE AV SIZE AND DURATION INTO ONE ARRAY
+    #-------------------------------------------------------
+    #-------------------------------------------------------
+    avsizecut = avsize[avsize >= 3]  #only select avalanches above 2
+    avframescut = framesvec[[avsize >=3]]
+    av = np.vstack((avsizecut, avframescut))      
+    
+    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + '0.590bin0.10nnbav_swap.npy', av)
+    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + '0.590bin0.10nnbpkg_swap.npy', pkg)
+    return(avlist, pkglist)
+
+#=======================================================================
+def avalanche3(nnblist, nnb, bind, savepath,experiment): # duration = yes convergence (no back propagation, earliest avalanche consumes meeting avalanche, and later avalanche terminates), cells in t must be active in t+1)
+#=======================================================================
+    import numpy as np
+    import os
+    import itertools
+
+#Calculate avalanche size + duration
+#-----------------------------------
+    avlist = list(range(len(nnblist)))
+    pkglist = list(range(len(nnblist)))
+    binarray, oldav, firstav, realav, timemachine, convertav, fill, time = [],[],[],[],[],[],[],[]
+    
+    #LOOP THROUGH EACH FISH
+    #---------------------------------
+    #---------------------------------
+    binarray, nnbarray, pkg = np.load(bind),np.load(nnb), np.zeros(np.load(bind).shape)
+    i, marker, avcount = 0,0,0
+        
+    #LOOP THROUGH EACH TIME POINT
+    #------------------------------
+    #------------------------------
+    for t in range(binarray.shape[1]-1): #loop through all time points
+        if i% round(10*binarray.shape[1]/100) == 0: print('doing time step ' + str(i) + 'of' + str(binarray.shape[1]) + 'for fish ') #+ str(y))
+        i = i+1
+        cid = np.where(binarray[:,t] > 0)[0]  #cid = cells active at current time point
+    
+            
+        #LOOP THROUGH EACH ACTIVE CELL
+        #-------------------------------
+        #-------------------------------
+        for c in cid:            #loop through all active cells at this time point
+
+            if pkg[c,t] == 0:    #only find non-marked cells
+                if len(np.intersect1d(np.where(nnbarray[c,:] > 0)[0], cid) > 2): #if >2 neighbours active
+                    marker = marker + 1  
+                    pkg[c,t] = marker  #mark active non-marked cell with new marker value
+                       
+
+            #LOCATE ALL NEIGHBOURS
+            #----------------------------
+            #----------------------------
+            neighbour = np.where(nnbarray[c,:] > 0)[0]  #return indeces of current cell neighbours
+            neighbouron  = np.intersect1d(cid,neighbour) #indeces of active cells in t, and also neighbours of c
+            where0 = np.where(pkg[neighbouron,t] == 0)[0] #neighbours not already part of an avalanche
+                
+            #CONVERT NEIGHBOURS WHO ARE ALREADY PART OF AN AVALANCHE
+            #-------------------------------------------------------
+            #-------------------------------------------------------
+
+            if len(where0) < len(neighbouron): #if any cells are already part of another avalanche
+                oldav = np.unique(pkg[neighbouron, t]) #all avalanche values from neighbours
+                firstav = np.min(oldav[np.where(oldav > 0)])   #minimum avalanche value that is not 0
+                    
+                    #define which cells we want to combine
+                realav =  oldav[np.where(oldav > 0)] #all avalanche values that are not 0
+                uniteav = np.where(pkg[:,t]==realav[:,None])[1] #indeces of all cells that need to be connected
+                pkg[uniteav,t] = firstav #convert all current cell neighbours and their active neighbours 
+                pkg[c,t] = firstav #also convert current cell
+                    
+                #GO BACK IN TIME AND CONVERT
+                #----------------------------
+                #----------------------------
+                convertav = realav[1:] #avalanche numbers needing to be converted
+                if t < 30:
+                    time = t-1
+                
+                elif t>30:
+                    time = 30
+                        
+                for e in range(convertav.shape[0]):
+                    for timemachine in range(1, time): #loop through max possible time of previous avalanche
+                        fill = np.where(pkg[:,t-timemachine] == convertav[e])[0]
+                        if fill.shape[0] > 0:
+                            pkg[fill, t-timemachine] = firstav 
+                                    
+            #CONVERT NEIGHBOURS WHO ARE NOT PART OF AN AVALANCHE
+            #-------------------------------------------------------
+            #-------------------------------------------------------
+            if len(where0) == len(neighbouron): #if all cells are not part of an avalanche
+                pkg[neighbouron[where0],t] = pkg[c,t]  
+
+            
+        #SEE IF AVALANCHE CAN PROPAGATE TO NEXT TIME FRAME
+        #-------------------------------------------------------
+        #-------------------------------------------------------
+        n_av = np.unique(pkg[:,t])  #returns the marker values for each avalanche at this time point
+    
+        for n in n_av: #loop through each avalanche in this time point
+            if n > 0:
+                cgroup = np.where(pkg[:,t] == n)[0] #cells that are in same avalanche at t
+                cid2 = np.where(binarray[:,t+1] > 0) #cells in next time point that are active
+                intersect = np.intersect1d(cgroup, cid2) #check if any of the same cells are active in next time point
+                wherealso0 = np.where(pkg[intersect,t+1] == 0)[0] #here we find all cells that are active in both time frames, and that are not already part of another avalanche - and mark them as current avalanche
+                pkg[intersect[wherealso0], t+1] = pkg[cgroup[0],t] #carry over value to next frame for those cells
+      
+    allmark = np.unique(pkg)[1:] #all unique marker values
+
+    #CALCULATE AVALANCHE SIZE
+    #-------------------------------------------------------
+    #-------------------------------------------------------
+    avsize = np.unique(pkg, return_counts = True)[1][1:] #return counts for each unique avalanche
+    frameslist = np.zeros(avsize.shape[0]) #create empty frames list of same length
+
+    #CALCULATE AVALANCHE DURATION
+    #-------------------------------------------------------
+    #-------------------------------------------------------
+    avpertimelist = list(range(pkg.shape[1])) #empty list of length time frames
+
+    for e in range(pkg.shape[1]): #loop through each time point in pkg
+            avpertime = np.unique(pkg[:,e]) #unique marker value in each time point
+            avpertimelist[e] = avpertime #fill list of unique values in each time point
+                          
+    #link entire recording together
+    #-----------------------------------------------------------
+    linktime = list(itertools.chain(*avpertimelist)) #vector of all unique marker values in each time bin linked together
+    framesvec = np.unique(linktime, return_counts = True)[1][1:] #vector of number of frames for each consecutive avalanche
+
+    #COMBINE AV SIZE AND DURATION INTO ONE ARRAY
+    #-------------------------------------------------------
+    #-------------------------------------------------------
+    avsizecut = avsize[avsize >= 3]  #only select avalanches above 2
+    avframescut = framesvec[[avsize >=3]]
+    av = np.vstack((avsizecut, avframescut))      
+    
+    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + '0.590bin0.10nnbav_slide.npy', av)
+    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + '0.590bin0.10nnbpkg_slide.npy', pkg)
     return(avlist, pkglist)
 
 
@@ -286,27 +544,20 @@ def loglik(Fdrop, experiment, distlist, dist1, dist2, normratio = True):
 #------------
         
 #=======================================================================
-def cellplot(Ftm, Fdrop,F10t, experiment, fnum, prefix, condition, plane, cell, xshift, yshift): # Plot cells and neighbours over image 
+def cellplot(Ftm, Fdrop, experiment, fnum, prefix, condition, plane, cell, xshift, yshift): # Plot cells and neighbours over image 
 #=======================================================================
     import os
     import glob
     import numpy as np
     from matplotlib import pyplot as plt
-    cs = []
+    
     
     Freg = Ftm + 'Project/' + experiment + '-' + fnum + prefix
     os.chdir(Freg)
     opslist = sorted(glob.glob('*' + condition + '*' +'plane' + str(plane) + '*ops.npy'))
-    ci   = np.where(cs[:,2] == plane)[0]    # Index of plane coordinates in long list
-    os.chdir(F10t + 'Project/' + experiment)
-    nnblist = sorted(glob.glob('*' + fnum +  '*' + condition + '*0.06nnb.npy'))
-    nnb = np.load(nnblist[0])
     os.chdir(Fdrop + 'Project/' + experiment)
     coordlist = sorted(glob.glob('*' + fnum +  '*' + condition + '*realcoord.npy'))
-    cs = np.load(coordlist[0])             # 3D array of xyz coordinates
-
-
-
+    nnblist = sorted(glob.glob('*' + fnum +  '*' + condition + '*nnb.npy'))
     
     if len(opslist) + len(coordlist) + len(nnblist) >3:
         print('More than one fish image loaded')
@@ -319,6 +570,9 @@ def cellplot(Ftm, Fdrop,F10t, experiment, fnum, prefix, condition, plane, cell, 
 
     # Pull out data from fish structure
     #----------------------------------------------------------------------------------------
+    cs = np.load(coordlist[0])             # 3D array of xyz coordinates
+    ci   = np.where(cs[:,2] == plane)[0]    # Index of plane coordinates in long list
+    nnb = np.load(nnblist[0])
 
     # Actual plotting routines
     #----------------------------------------------------------------------------------------
@@ -328,97 +582,24 @@ def cellplot(Ftm, Fdrop,F10t, experiment, fnum, prefix, condition, plane, cell, 
     plt.show()
 
             
-
-#================================================
-def powerfit_param(Fdrop, F10t, experiment, cutoff, num):
-#=================================================
+#==========================================================================
+def powerfit(Fdrop, experiment, data,  cutoff):
+#==========================================================================
     import os
     import numpy as np
     import glob
     import powerlaw
+    param = np.zeros((5))
+    maxi = np.max(np.unique(data, return_counts = True)[0][np.unique(data, return_counts = True)[1] > cutoff]) #fit power law max - maximum value that appears more than 3 times
+    fit = powerlaw.Fit(data, discrete = True, xmax = maxi) #fit power law to data - MLE    
+    alpha = fit.power_law.alpha
+    sigma = fit.power_law.sigma
+    if maxi - fit.xmin > 3:
+        R, p = fit.distribution_compare('truncated_power_law', 'lognormal', normalized_ratio=True)
+        param[0],param[1] = R,p
+    param[2],param[3], param[4]= alpha, sigma, maxi
+    return(param)
     
-    os.chdir(F10t + 'Project/' + experiment)
-    itav = sorted(glob.glob('*E-' + str(num) + '*nnbav.npy*'))
-    os.chdir(Fdrop + 'Project/' + experiment)
-    coord = sorted(glob.glob('*E-' + str(num) + '*BLN*realcoord*')) 
-    cells = np.load(coord[0]).shape[0]
-    os.chdir(F10t + 'Project/' + experiment)
-    
-    paramar = np.zeros((len(itav), 6))
-    for i in range(len(itav)):
-        data = np.load(itav[i])[1]
-        if len(data) < 10 : #if less than 10 avalanches skip 
-            continue
-        maxi = np.max(np.unique(data, return_counts = True)[0][np.unique(data, return_counts = True)[1] > cutoff]) #fit power law max - maximum value that appears more than 3 times
-        fit = powerlaw.Fit(data, discrete = True, xmax = maxi) #fit power law to data - MLE    
-        alpha = fit.power_law.alpha
-        sigma = fit.power_law.sigma
-        if maxi - fit.xmin > 3:
-            R, p = fit.distribution_compare('truncated_power_law', 'lognormal', normalized_ratio=True)
-            paramar[i,0] = R
-            paramar[i,1] = p
-        paramar[i,2] = alpha
-        paramar[i,3] = sigma
-        paramar[i,4] = maxi
-        paramar[i,5] = maxi/cells
-
-    np.save(Fdrop + 'Project/' + experiment + os.sep + coord[0][:coord[0].find('run')+6] + '_' + 'durparamsweep1.npy', paramar)
-    print('Done fish num ' + str(f))     
-
-#==========================================================================
-def powerfit(Fdrop, experiment, distlist, mode):
-#==========================================================================
-
-    import pylab
-    pylab.rcParams['xtick.major.pad']='8'
-    pylab.rcParams['ytick.major.pad']='8'
-    from matplotlib import rc
-    rc('font', family='sans-serif')
-    rc('font', size=10.0)
-    rc('text', usetex=False)
-    from matplotlib.font_manager import FontProperties
-    panel_label_font = FontProperties().copy()
-    panel_label_font.set_weight("bold")
-    panel_label_font.set_size(12.0)
-    panel_label_font.set_family("sans-serif")
-
-        #PLOT - log binning (blue) vs linear binning (red)
-        #calculate density functions - pdf, cdf and ccdf 
-        #plot commands - plot_pdf, plot_cdf, and plot_ccdf, takes matplotlib keywordargs
-        #-------------------------------------------------------------------------------
-    if mode == 'loglin':
-        data = distlist
-        for i in range(len(data)):
-            fig, ax = plt.subplots(figsize = (5,5)) 
-            figPDF = powerlaw.plot_pdf(np.load(data[i]), color='b', label = 'log') #default log binning - increases likelihood of observing a range of                                                                         #values in the tail 
-#of distribution where some high values may occur, rather than binning it into single bin
-            powerlaw.plot_pdf(np.load(data[i]), linear_bins=True, color='r', ax=figPDF)
-####
-            figPDF.set_ylabel("Probability", size = 20)
-            figPDF.set_xlabel(r"Avalanche size", size = 20)
-#PLOT - power law fit (dotted) to probability density (blue) and cumulative density (red)
-#fit - powerlaw, lognormal
-#-----------------------------------------------------------------------------------------
-
-    if mode == 'fit':
-
-        for i in range(len(praclist)):
-            fig, ax = plt.subplots(figsize = (5,5))
-            data = np.load(distlist[i])
-            fit = powerlaw.Fit(data, discrete=True) #fit power law to your data
-####
-            figCCDF = fit.plot_pdf(color='b', linewidth=2) #pdf is better at visualising changes in the tail
-            fit.power_law.plot_pdf(color='b', linestyle='--', ax=figCCDF) 
-            fit.plot_ccdf(color='r', linewidth=2, ax=figCCDF) #ccdf does not require binning
-            fit.power_law.plot_ccdf(color='r', linestyle='--', ax=figCCDF) 
-####
-            figCCDF.set_ylabel(u"p(X),  p(X≥x)")
-            figCCDF.set_xlabel(r"Word Frequency")
-
-            figname = 'FigCCDF'
-
-
-
             
 #===============================================
 def power_plot(data, data_inst, fig, units):

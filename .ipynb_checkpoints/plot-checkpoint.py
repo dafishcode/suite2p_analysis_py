@@ -32,6 +32,7 @@ def boxplot(Fdrop, experiment, plotlist, title):
     plt.ylabel(title, size = 30, color = 'black')
     plt.xticks(np.arange(3), ('Baseline','PTZ 5mM', 'PTZ 20mM'), size = 15, color = 'black')
     plt.yticks(color = 'black')
+    plt.savefig('branch.png')
     #plt.show()
     #sns.reset_orig()
     #plt.style.use('dark_background')
