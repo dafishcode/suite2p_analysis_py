@@ -1,9 +1,11 @@
 #SORT
 #=============================
 #=============================
+import avalanches as crfn
+
 
 #=============================
-def name(path, experiment, start, end): #add 0 to number if above 10
+def name_zero(path, experiment, start, end): #add 0 to number if above 10
 #=============================
     import os 
     count = 0
@@ -19,7 +21,7 @@ def name(path, experiment, start, end): #add 0 to number if above 10
     return(listme)
 
 #=============================
-def nameli(path, experiment, inp, string): #return name list
+def name_list(path, experiment, inp, string): #return name list
 #=============================
     import os 
     import glob
@@ -30,6 +32,16 @@ def nameli(path, experiment, inp, string): #return name list
         out = str(inp)
     return(sorted(glob.glob('*E-' + str(out) + string)))
 
+#=============================
+def name_template(name, mode): #return name list
+#=============================
+    if mode == 'short':
+        temp = name[:name.find('run')+6] 
+    
+    if mode == 'long':
+        temp = name[:name.find('.npy')-3] 
+        
+    return(temp)
 
 #==============================
 def save_name(i, name_li): #find save name
@@ -39,21 +51,22 @@ def save_name(i, name_li): #find save name
 #PROCESS
 #=============================
 #=============================
-
 #=====================================================================
-def parallel(cores, datalist1, datalist2, func, paramlist): #make sure n_cores is divisible by total number
+def parallel(cores, datalist, func, paramlist): #make sure n_cores is divisible by total number
 #=====================================================================
     from multiprocessing import Pool
     import numpy as np
     pool = Pool(cores)
-    paramlist_levels = list(range(cores))
     count = 0
-    for i in range((np.int(len(datalist1)/cores))):
+    for i in range((np.int(len(datalist)/cores))):
+        paramlist_levels = list(range(cores))
         for e in range(len(paramlist_levels)):
-            paramlist_levels[e] = np.append(paramlist, datalist1[count], datalist2[count])
+            newlist = datalist[count:count+1]
+            newlist.extend(paramlist)
+            paramlist_levels[e] = newlist
             count+=1
         output = pool.starmap(func, paramlist_levels)
-    
+
 #MATHS
 #=============================
 #=============================
