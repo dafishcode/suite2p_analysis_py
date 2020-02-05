@@ -1,3 +1,5 @@
+import admin_functions as adfn
+
 #PROCESS
 #------------
 #------------
@@ -42,7 +44,7 @@ def neighbour(cnt, savepath, experiment, rng, dim, name): # Select which fish da
             #--------------------------------------------------------------
         mini = np.where(distance[0,:] < np.nanpercentile(distance[0,:],cnt))[0]
         nnb[r,mini] = 1 #binary value defining whether in range or not 
-    np.save(savepath + 'Project/' + experiment + os.sep + name[:name.find('run')+6] + str(cnt) + 'nnb.npy', nnb)
+    np.save(savepath + 'Project/' + experiment + os.sep + name[:name.find('run')+6] + '_' +    str(cnt) + 'nnb.npy', nnb)
     return(nnb)
 
 
@@ -50,7 +52,7 @@ def neighbour(cnt, savepath, experiment, rng, dim, name): # Select which fish da
 #------------
 #------------
 #=======================================================================
-def avalanche(nnb, bind, savepath,experiment, addname): # duration = yes convergence (no back propagation, earliest avalanche consumes meeting avalanche, and later avalanche terminates), cells in t must be active in t+1)
+def avalanche(nnb, bind, savepath,experiment): # duration = yes convergence (no back propagation, earliest avalanche consumes meeting avalanche, and later avalanche terminates), cells in t must be active in t+1)
 #=======================================================================
     import numpy as np
     import os
@@ -172,10 +174,9 @@ def avalanche(nnb, bind, savepath,experiment, addname): # duration = yes converg
     avframescut = framesvec[[avsize >=3]]
     av = np.vstack((avsizecut, avframescut))      
     
-    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + str(addname) + 'av.npy', av)
-    np.save(savepath + 'Project/' + experiment + os.sep + bind[:bind.find('run')+7] + str(addname) +'pkg.npy', pkg)
+    np.save(savepath + 'Project/' + experiment + os.sep + adfn.name_template([bind,nnb], 'param') + 'av.npy', av)
+    np.save(savepath + 'Project/' + experiment + os.sep +    adfn.name_template([bind,nnb], 'param') + 'pkg.npy', pkg)
     return(av, pkg)
-
 
 #==========================================================================
 def powerfit(Fdrop, experiment, data,  cutoff):
@@ -194,6 +195,41 @@ def powerfit(Fdrop, experiment, data,  cutoff):
     param[0],param[1] = R,p
     param[2],param[3], param[4]= alpha, sigma, maxi
     return(param)
+
+#=======================================================================
+def branch(pkgname, avname, savepath,experiment): # branching ratio calculation
+#=======================================================================
+    import numpy as np
+    import os
+    branchmean = []
+    pkg = np.load(pkgname)
+    brancharr = np.zeros((np.int(np.max(pkg)), np.max(np.load(avname)[1])))
+    i = 0
+        
+    for t in range(pkg.shape[1]): #loop through all time points
+        if t == pkg.shape[1]-1:
+            break
+        n1 = np.unique(pkg[:,t])  #unique marker values at each time point
+        n2 = np.unique(pkg[:,t+1]) 
+        nx = np.intersect1d(n1, n2) #marker values that continue to next time frame
+    
+        if i% round(10*pkg.shape[1]/100) == 0: print('doing time step ' + str(i) + ' of ' + str(pkg.shape[1]) + ' for fish ' + pkgname)
+        i = i+1
+
+        for mark in nx[1:]: #loop through each marker value at this time point (only if marker active in next time point)
+            if mark == brancharr.shape[0]:
+                continue
+            mark = np.int(mark)
+            ancestor = np.unique(pkg[:,t], return_counts = True)[1][np.where(np.unique(pkg[:,t], return_counts = True)[0] == mark)[0]][0] #number of cells in that avalanche for that marker value at time point t  
+            descend = np.unique(pkg[:,t+1], return_counts = True)[1][np.where(np.unique(pkg[:,t+1], return_counts = True)[0] == mark)[0]][0] #same as above for next time point
+            brancharr[mark, np.where(brancharr[mark] == 0)[0][0]] = (descend/ancestor)
+    branchmean = np.mean(brancharr[np.where(brancharr > 0)])
+    np.save(savepath + 'Project/' + experiment + os.sep + adfn.name_template([pkgname], 'long') + '_branch.npy', branchmean)
+    
+    
+
+    
+    
     
         
 #PLOT
