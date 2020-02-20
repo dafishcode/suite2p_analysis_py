@@ -41,15 +41,15 @@ def name_zero(pad, start, end, step): #add 0 to string of number - for saving
 
 
 #=============================
-def name_list(path, experiment, inp, string): #return name list
+def name_list(path, experiment, num, string): #return name list
 #=============================
     import os 
     import glob
     os.chdir(path + 'Project/' + experiment)
-    if inp < 10:
-        out = '0' + str(inp)
-    elif inp >9:
-        out = str(inp)
+    if num < 10:
+        out = '0' + str(num)
+    elif num >9:
+        out = str(num)
     return(sorted(glob.glob('*E-' + str(out) + string)))
 
 #=============================
@@ -81,11 +81,9 @@ def save_name(i, name_li): #find save name
     return(name_li[i][:name_li[i].find('run')+6])
 
 #==============================
-def list_of_list(lengths): #expects a list of lists
+def list_of_list(rows, cols): #expects a list of lists
 #===============================
-    listoflist = []
-    for i in range(len(lengths)):
-        listoflist = [listoflist for i in range(lengths[i] + 1)]
+    listoflist = [[[] for i in range(cols)] for j in range(rows)]
     return(listoflist)
 
 
