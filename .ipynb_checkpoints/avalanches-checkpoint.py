@@ -369,8 +369,7 @@ def branch(pkgname, avname, savepath,experiment): # branching ratio calculation
             descend = np.unique(pkg[:,t+1], return_counts = True)[1][np.where(np.unique(pkg[:,t+1], return_counts = True)[0] == mark)[0]][0] #same as above for next time point
             brancharr[mark, np.where(brancharr[mark] == 0)[0][0]] = (descend/ancestor)
     branchmean = np.mean(brancharr[np.where(brancharr > 0)])
-    return(branchmean)
-    #np.save(savepath + 'Project/' + experiment + os.sep + adfn.name_template([pkgname], 'long') + '_branch.npy', branchmean)
+    np.save(savepath + 'Project/' + experiment + os.sep + adfn.name_template([pkgname], 'long') + '_branch.npy', branchmean)
     
     
 
