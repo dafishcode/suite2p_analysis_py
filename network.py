@@ -45,7 +45,7 @@ def funck(Fdrop, experiment, ktrace, kcoord):    # K-means clustering on correla
         print('Clustering fish ' + str(y + 1)+ ' of ' + str(len(ktrace)))
         corr = np.corrcoef(np.load(ktrace[y])) 
         coord = np.load(kcoord[y])[:,:3]
-        kmeans = KMeans(n_clusters=100, random_state=0).fit(corr)
+        kmeans = KMeans(n_clusters=16, random_state=0).fit(corr)
         klabel = kmeans.labels_
         kcoordnew = np.column_stack((coord,klabel)) #add labels to original kcoord array
         kcoordlist[y] = kcoordnew

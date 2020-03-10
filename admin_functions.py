@@ -87,6 +87,21 @@ def list_of_list(rows, cols): #expects a list of lists
     return(listoflist)
 
 
+#=======================================================================
+def mean_distribution(distlist, choose): #Generate mean distribution 
+#=======================================================================
+    import numpy as np
+    comb_vec = []
+    for i in range(len(distlist)):
+        comb_vec = np.append(comb_vec, np.load(distlist[i])[choose])
+    av = np.unique(comb_vec, return_counts=True)[0]
+    freq = (np.unique(comb_vec, return_counts=True)[1]/50).astype(int)
+    mean_vec = []
+    for e in range(freq.shape[0]):
+        mean_vec = np.append(mean_vec, np.full(freq[e],av[e]))
+    return(mean_vec)
+
+
 #PROCESS
 #=============================
 #=============================

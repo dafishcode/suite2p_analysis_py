@@ -371,7 +371,25 @@ def branch(pkgname, avname, savepath,experiment): # branching ratio calculation
     branchmean = np.mean(brancharr[np.where(brancharr > 0)])
     np.save(savepath + 'Project/' + experiment + os.sep + adfn.name_template([pkgname], 'long') + '_branch.npy', branchmean)
     
-    
+
+#====================================================================================================
+def ks_compare(distlist, mean_dist, bln_dist, choose, shape): #Ks distance groupwise statistical test
+#=====================================================================================================
+    import numpy as np
+    from scipy import stats
+    ks_p = np.zeros(2)
+    ks = np.zeros(shape)
+    for i in range(len(distlist)):
+        ks[i] = stats.ks_2samp(mean_dist, np.load(distlist[i])[choose])[0]
+    mean = np.mean(ks)
+    sd = 1.96*np.std(ks)
+    ks_diff = stats.ks_2samp(bln_dist[choose], mean_dist)[0]
+    if ks_diff > mean + sd or ks_diff < mean - sd:
+        p = 0
+    else:
+        p = 1
+    ks_p = [ks_diff, p]
+    return(ks_p)
 
     
     
