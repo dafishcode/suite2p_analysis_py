@@ -142,7 +142,19 @@ def parallel(cores, listlist, func, paramlist): #make sure n_cores is divisible 
                     count+=1 
             output = pool.starmap(func, paramlist_levels)
 
+            
+            
+            
 #MATHS
 #=============================
 #=============================
 
+#=======================================================================================
+def window(size, times): #make window of given size that is divisible of time series
+#=======================================================================================
+    for i in range(100):
+        if times % size ==0:
+            break
+        else:
+            size+=1
+    return(size)
