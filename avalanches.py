@@ -48,6 +48,53 @@ def neighbour(cnt, savepath, experiment, rng, dim, name): # Select which fish da
     return(nnb)
 
 
+#=======================================================================
+def corrdis_bin(corr, dist, name, bins):
+#=======================================================================
+    import numpy as np
+    if corr.shape[0] != dist.shape[0]:
+        print('Correlation and Distance matrices have unequal cell numbers')
+        exit()
+    corr = np.triu(corr, k=0)
+    dist = np.triu(dist, k=0)
+    corr_v = corr.flatten()
+    dist_v = dist.flatten()
+
+    corr_v = [0 if o < 0 else o for o in corr_v]
+    corr_v = np.array(corr_v)
+    dist_v[np.where(corr_v == 0)] = 0
+
+    unq = np.unique(dist_v)
+    dist_vs = np.sort(dist_v)
+    corr_vs = np.array([x for _,x in sorted(zip(dist_v,corr_v))])
+    window = adfn.window(np.int((unq.shape[0]/bins)), unq.shape[0])
+
+    count, bincount=0,0
+    dist_bins, corr_bins = np.zeros(np.int(unq.shape[0]/window)),np.zeros(np.int(unq.shape[0]/window))
+    for i in range(np.int(unq.shape[0]/window)):
+        if i == np.int(unq.shape[0]/window)-1:
+            break
+        start = count
+        stop = count+window
+        start_in = np.where(dist_vs == unq[start])[0][0] 
+        stop_in = np.where(dist_vs == unq[stop])[0][0] - 1
+
+        sumd_c = np.sum(corr_vs[start_in:stop_in])
+        div_c = len(np.where(corr_vs[start_in:stop_in] !=0)[0])
+        corr_bins[bincount] = sumd_c/div_c
+
+        sumd_d = np.sum(dist_vs[start_in:stop_in])
+        dist_bins[bincount] = sumd_d/div_c
+
+        bincount+=1
+        count+=window
+        adfn.timeprint(i, np.int(unq.shape[0]/window), name)
+
+    return(np.vstack((dist_bins, corr_bins)))
+    
+    
+    
+
 #ANALYSIS
 #------------
 #------------
@@ -391,8 +438,16 @@ def ks_compare(distlist, mean_dist, bln_dist, choose, shape): #Ks distance group
     ks_p = [ks_diff, p]
     return(ks_p)
 
-    
-    
+#=====================================================================================================    
+def euclidean_mat(input_coord, spatial_conversion):
+#=====================================================================================================
+    trans_coord = np.multiply(input_coord, spatial_conversion)
+    mat = np.zeros((trans_coord.shape[0], trans_coord.shape[0]))
+    for f in range(trans_coord.shape[0]):
+        for x in range(trans_coord.shape[0]):
+            mat[f,x] =  np.linalg.norm(trans_coord[f] - trans_coord[x])
+            
+    return(mat) 
         
 #PLOT
 #------------

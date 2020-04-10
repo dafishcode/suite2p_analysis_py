@@ -142,13 +142,17 @@ def parallel(cores, listlist, func, paramlist): #make sure n_cores is divisible 
                     count+=1 
             output = pool.starmap(func, paramlist_levels)
 
-            
+        
+#=======================================================================================        
+def timeprint(r, numrows, name): #Print row number
+#=======================================================================================
+    if r % round((10*numrows/100)) == 0: 
+            print("Doing row " + str(r) + " of " + str(numrows) + " for " + name)
             
             
 #MATHS
 #=============================
 #=============================
-
 #=======================================================================================
 def window(size, times): #make window of given size that is divisible of time series
 #=======================================================================================
@@ -158,3 +162,45 @@ def window(size, times): #make window of given size that is divisible of time se
         else:
             size+=1
     return(size)
+
+#=======================================================================================
+def ttest(mydf, label, variable, comp_list, mode):
+#=======================================================================================
+    from scipy import stats 
+    #Single comparison - label to compare to first element in list
+    if mode == 'single':
+        vals = list_of_list(len(comp_list)-1, 5)
+        sig = 0.05/(len(comp_list)-1)
+        base = comp_list[0]
+        for i in range(len(comp_list)-1):
+            vals[i][0], vals[i][1] = stats.ttest_rel(mydf[variable].where(mydf[label] == base).dropna(),mydf[variable].where(mydf[label] == comp_list[i+1]).dropna())[0],stats.ttest_rel(mydf[variable].where(mydf[label] == base).dropna(),mydf[variable].where(mydf[label] == comp_list[i+1]).dropna())[1]
+            vals[i][2] = sig
+            vals[i][4] = str(base) + ' - ' + str(comp_list[i+1])
+            if vals[i][1] < sig:
+                vals[i][3] = 'Significant'
+            else:
+                vals[i][3] = 'Not significant'
+    
+    
+    if mode == 'multiple':
+        vals = list(range(len(comp_list)))
+        ncomp = 0
+        for i in range(len(comp_list)):
+            ncomp+= (len(comp_list)-1) - i
+        sig = 0.05/ncomp
+        
+        for i in range(len(comp_list)):
+            subval = list_of_list(len(comp_list), 5)
+            for e in range(len(comp_list)):
+                subval[e][0], subval[e][1] = stats.ttest_rel(mydf[variable].where(mydf[label] == comp_list[i]).dropna(),mydf[variable].where(mydf[label] == comp_list[e]).dropna())[0],stats.ttest_rel(mydf[variable].where(mydf[label] == comp_list[i]).dropna(),mydf[variable].where(mydf[label] == comp_list[e]).dropna())[1]
+                subval[e][2] = sig
+                subval[e][4] = str(comp_list[i]) + ' - ' + str(comp_list[e])
+                if subval[e][1] < sig:
+                    subval[e][3] = 'Significant'
+                else:
+                    subval[e][3] = 'Not significant'
+            vals[i] = subval
+    
+    
+    return(vals)
+
