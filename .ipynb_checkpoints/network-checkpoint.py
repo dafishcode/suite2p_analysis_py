@@ -125,6 +125,60 @@ def divconq(kcoord, i, Fdrop, experiment, kcoordinput, kread):   # K-labels, coo
     return(nkl)
 
 
+#===============================================================================
+def watts_strogatz(edge_density, p, Nnodes, dist, savepath): 
+#==============================================================================
+
+    """Generate random small world graph with specific Edge density. The Watts-Strogatz model has (i) a small average shortest path length, and (ii) a large clustering coefficient. The algorithm works by assigning a pre-defined number of connections between k-nearest neighbours - it then loops through each node and according to some uniform probability re-assigns its edges from its connected k-nearest neighbours and a random unconnected node. 
+
+    edge_density = number of k_nearest neighbours each node is connected to
+    p = probability of an edge being randomly re-assigned
+    Nnodes = number of nodes
+    dist = distance matrix between all nodes in network
+    """
+
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from matplotlib import cm
+    import networkx as nx
+    from sklearn.metrics.pairwise import euclidean_distances
+    import copy
+    import random
+    
+    k_neighbours  = int(Nnodes * edge_density)
+    A  = np.zeros(dist.shape)
+
+    if k_neighbours == 0: 
+        return A
+    
+    # Loop through rows of distance matrix to find k_neighbours
+    #-----------------------------------------------------------------------------
+    for row in range(dist.shape[0]):
+        neighbours = dist[row,].argsort()[:k_neighbours+1][::-1] #find neighbours 
+        A[row,neighbours[:-1]] = 1 #make all edges of neighbours connected in network
+        A[neighbours[:-1],row] = 1
+
+    # Rewire connections with certain probability
+    #-----------------------------------------------------------------------------
+    [rows, cols]    = np.where(np.triu(A) == 1) 
+    probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
+    edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
+    old_A  = copy.deepcopy(A) #create copy of A
+
+
+    for e in range(edges_to_change.shape[0]): #Loop through edges to change
+        this_edge = edges_to_change[e]
+        A[rows[this_edge], cols[this_edge]] = 0         # switch off old edge
+        A[cols[this_edge], rows[this_edge]] = 0
+
+        where_0 = np.where(A[rows[this_edge]] == 0)[0] #find possible connections to reassign to
+        new_edge = random.choice(where_0[np.where(where_0 !=rows[this_edge])[0]]) #randomly choose one - ignoring any connections on the diagonal 
+        #Assign connection
+        A[rows[this_edge], new_edge] = 1        # switch off old edge
+        A[new_edge, rows[this_edge]] = 1
+    np.save(savepath + 'netparam-k' + str(edge_density) + '-p' + str(p) +  '.npy', old_A)
+    return A, old_A
 
 #ANALYSIS
 #------------

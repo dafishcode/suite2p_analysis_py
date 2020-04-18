@@ -106,8 +106,15 @@ def mean_distribution(distlist, choose): #Generate mean distribution
 #=============================
 #=============================
 #=====================================================================
-def parallel(cores, listlist, func, paramlist): #make sure n_cores is divisible by total number
+def parallel(cores, listlist, func, paramlist): 
 #=====================================================================
+    """This function allows parallel pooling of processes
+    cores = number of cores ()
+    listlist = list of list with inputs that you will parallel process - each list should contain each unique combination of parameter inputs -  (inputs must be at the start of function inputs)
+    func = function name
+    paramlist = list containing function parameters 
+
+    """
     from multiprocessing import Pool
     import numpy as np
     pool = Pool(cores)
@@ -144,10 +151,15 @@ def parallel(cores, listlist, func, paramlist): #make sure n_cores is divisible 
 
         
 #=======================================================================================        
-def timeprint(r, numrows, name): #Print row number
+def timeprint(r, numrows, name):
 #=======================================================================================
+    """ Print current time step
+        r = current iterator value
+        numrows = total number of steps
+        name = name to output
+    """
     if r % round((10*numrows/100)) == 0: 
-            print("Doing row " + str(r) + " of " + str(numrows) + " for " + name)
+            print("Doing number " + str(r) + " of " + str(numrows) + " for " + name)
             
             
 #MATHS
