@@ -110,7 +110,47 @@ def parallel(cores, listlist, func, paramlist):
 #=====================================================================
     """This function allows parallel pooling of processes
     cores = number of cores ()
-    listlist = list of list with inputs that you will parallel process - each list should contain each unique combination of parameter inputs -  (inputs must be at the start of function inputs)
+    paramlist = list with parameter inputs that you will parallel process (inputs must be at start of function)
+    func = function name
+    paramlist = list containing function parameters 
+    returns - an list of outputs
+    """
+    from multiprocessing import Pool
+    import numpy as np
+    pool = Pool(cores)
+    count = 0
+
+    output_list = list(range((np.int(len(listlist)/cores))))
+    for i in range(len(output_list)):
+        paramlist_levels = list(range(cores))
+        for e in range(len(paramlist_levels)):
+            newlist = listlist[count:count+1]
+            newlist.extend(paramlist)
+            paramlist_levels[e] = newlist
+            count+=1
+        output_list[i] = pool.starmap(func, paramlist_levels)
+
+
+    #Append all calculated value together
+    if isinstance(output_list[0][0], int):
+        return(np.hstack(np.array(output_list)))
+    else:
+        return_list = list(range(len(output_list[0][0])))
+        new_array = np.vstack(np.array(output_list))
+        return([new_array[:,i] for i in range(new_array.shape[1])])
+
+    return(return_list)
+
+
+#PROCESS
+#=============================
+#=============================
+#=====================================================================
+def parallel_class(cores, listlist, func, paramlist): 
+#=====================================================================
+    """This function allows parallel pooling of processes from a class function
+    cores = number of cores ()
+    paramlist = list with parameter inputs that you will parallel process (inputs must be at start of function)
     func = function name
     paramlist = list containing function parameters 
 
@@ -120,45 +160,37 @@ def parallel(cores, listlist, func, paramlist):
     pool = Pool(cores)
     count = 0
 
-    if len(listlist) == 1:
-        for i in range((np.int(len(listlist[0])/cores))):
-            paramlist_levels = list(range(cores))
-            for e in range(len(paramlist_levels)):
-                newlist = listlist[0][count:count+1]
-                newlist.extend(paramlist)
-                paramlist_levels[e] = newlist
-                count+=1
-            output = pool.starmap(func, paramlist_levels)
-            
-    if len(listlist) > 1:
-        for i in range(len(listlist)):
-            if len(listlist[i]) != len(listlist[0]):
-                print('Input lists must be the same length')
-                exit()
-            
-        for i in range((np.int(len(listlist[0])/cores))):
-            paramlist_levels = list(range(cores))
-            for e in range(len(paramlist_levels)):
-                for t in range(len(listlist)):
-                    if t == len(listlist)-1:
-                        newlist.extend(paramlist)
-                        break
-                    newlist = listlist[t][count:count+1]
-                    newlist.extend(listlist[t+1][count:count+1])
-                    paramlist_levels[e] = newlist
-                    count+=1 
-            output = pool.starmap(func, paramlist_levels)
+    output_list = list(range((np.int(len(listlist)/cores))))
+    for i in range(len(output_list)):
+        paramlist_levels = list(range(cores))
+        for e in range(len(paramlist_levels)):
+            newlist = listlist[count:count+1]
+            newlist.extend(paramlist)
+            paramlist_levels[e] = newlist
+            count+=1
+        output_list[i] = pool.starmap(func, paramlist_levels)
 
+
+    #Append all calculated value together
+    if isinstance(output_list[0][0], int):
+        return(np.hstack(np.array(output_list)))
+    else:
+        return_list = list(range(len(output_list[0][0])))
+        new_array = np.vstack(np.array(output_list))
+        return([new_array[:,i] for i in range(new_array.shape[1])])
+
+    return(return_list)
         
 #=======================================================================================        
-def timeprint(r, numrows, name):
+def timeprint(per, r, numrows, name):
 #=======================================================================================
-    """ Print current time step
+    """ Print current time step every percentile
+        per = how often you want to print (as percintiles)
         r = current iterator value
         numrows = total number of steps
         name = name to output
     """
-    if r % round((10*numrows/100)) == 0: 
+    if r % round((per*numrows/100)) == 0: 
             print("Doing number " + str(r) + " of " + str(numrows) + " for " + name)
             
             
@@ -168,12 +200,22 @@ def timeprint(r, numrows, name):
 #=======================================================================================
 def window(size, times): #make window of given size that is divisible of time series
 #=======================================================================================
-    for i in range(100):
+    """Returns the window size that is the closest divisor of a timeseries to given input
+    Inputs:
+    size - ideal window size
+    times - overall trace shape
+    
+    Returns: 
+    size - window size that is divisible by trace (rounds up)
+    n_windows - number of windows that split up trace
+    """
+    for i in range(times):
         if times % size ==0:
             break
         else:
             size+=1
-    return(size)
+    n_windows = int(times/size)
+    return(size, n_windows)
 
 #=======================================================================================
 def ttest(mydf, label, variable, comp_list, mode):
