@@ -153,9 +153,9 @@ class netsim:
             #down = int(k_neighbours)
             #up= int(k_neighbours)+1
             #if np.random.uniform(down, up) >= k_neighbours:
-            #    k_neighbours = up
-            #else:
             #    k_neighbours = down
+            #else:
+            #    k_neighbours = up
             neighbours = self.dist[row,].argsort()[:k_neighbours+1][::-1] #find neighbours 
             self.A[row,neighbours[:-1]] = 1 #make all edges of neighbours connected in network
             self.A[neighbours[:-1],row] = 1
