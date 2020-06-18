@@ -123,9 +123,10 @@ def divconq(kcoord, i, Fdrop, experiment, kcoordinput, kread):   # K-labels, coo
     print('Clustered fish ' + str(i + 1)+ ' of ' + str(len(kcoord)))
     return(nkl)
 
-
+#=====================
 #=====================
 class netsim: 
+#=====================
 #=====================
     """
     Class to perform network simulations

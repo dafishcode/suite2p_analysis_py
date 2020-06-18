@@ -104,82 +104,131 @@ def mean_distribution(distlist, choose): #Generate mean distribution
 
 #PROCESS
 #=============================
-#=============================
 #=====================================================================
-def parallel(cores, listlist, func, paramlist): 
+def parallel_func(cores, savepath, iter_list, func, param_list, name, variables, mode): 
 #=====================================================================
-    """This function allows parallel pooling of processes
-    cores = number of cores ()
-    paramlist = list with parameter inputs that you will parallel process (inputs must be at start of function)
+    """This function allows parallel pooling of processes using functions
+    cores = number of cores 
+    savepath = path for saving
+    iter_list = list with parameter inputs that you will parallel process (inputs must be at start of function)
     func = function name
-    paramlist = list containing function parameters 
-    returns - an list of outputs
+    param_list = list containing remaining function parameters 
+    name = filename for saving, should be unique if mode = save_group
+    variables = list containing name endings for each variable, if function returns multiple
+    mode = output type:
+        save_single - saves each instance of function output individually
+        save_group - saves all batched function outputs in a list
+        NA - returns all batched function outputs in a list, without saving
     """
+    
     from multiprocessing import Pool
     import numpy as np
-    pool = Pool(cores)
+    pool = Pool(cores) #number of cores
     count = 0
 
-    output_list = list(range((np.int(len(listlist)/cores))))
-    for i in range(len(output_list)):
-        paramlist_levels = list(range(cores))
-        for e in range(len(paramlist_levels)):
-            newlist = listlist[count:count+1]
-            newlist.extend(paramlist)
-            paramlist_levels[e] = newlist
+    batch_list = list(range((np.int(len(iter_list)/cores)))) #define number of batches
+
+    for i in range(len(batch_list)): #process each batch
+        cores_inputs = list(range(cores)) #define input for each core
+        for e in range(len(cores_inputs)):  
+            sub_iter_list = iter_list[count:count+1] #Find current iter value - add to subset iter_list
+            sub_iter_list.extend(param_list) #Append current iter value onto remaining parameter
+            cores_inputs[e] = sub_iter_list 
             count+=1
-        output_list[i] = pool.starmap(func, paramlist_levels)
+        batch_list[i] = pool.starmap(func, cores_inputs) #pool process on each core
 
+        if mode == 'save_single':
+            for t in range(cores):  #loop through each core in current loop
+                for f in range(len(batch_list[i][t])):
+                    save_var = batch_list[i][t][f] #function output for current core in current batch
+                    save_name = name + '-' + str(cores_inputs[t][0]) + '-' + variables #save name based on iterable parameter
+                    np.save(savepath + save_name, save_var)
+        
+    if mode != 'save_single':
+        #Append all calculated value together
+        if isinstance(batch_list[0][0], int) or isinstance(batch_list[0][0], float) :
+            return_me = np.hstack(np.array(batch_list))
+        else:
+            return_list = list(range(len(batch_list[0][0])))
+            new_array = np.vstack(np.array(batch_list))
+            return_me = [new_array[:,i] for i in range(new_array.shape[1])]
 
-    #Append all calculated value together
-    if isinstance(output_list[0][0], int):
-        return(np.hstack(np.array(output_list)))
-    else:
-        return_list = list(range(len(output_list[0][0])))
-        new_array = np.vstack(np.array(output_list))
-        return([new_array[:,i] for i in range(new_array.shape[1])])
+        if mode == 'save_group':
+            save_name = name
+            np.save(savepath + save_name, return_me)
 
-    return(return_list)
-
-
-#PROCESS
-#=============================
-#=============================
+        else:
+            return(return_me)
+      
+    
 #=====================================================================
-def parallel_class(cores, listlist, func, paramlist): 
+def parallel_class(cores, savepath, iter_list, func, param_list, name, variables, mode): 
 #=====================================================================
-    """This function allows parallel pooling of processes from a class function
-    cores = number of cores ()
-    paramlist = list with parameter inputs that you will parallel process (inputs must be at start of function)
+    """This function allows parallel pooling of processes using classes
+    cores = number of cores 
+    savepath = path for saving
+    iter_list = list with parameter inputs that you will parallel process (inputs must be at start of function)
     func = function name
-    paramlist = list containing function parameters 
-
+    param_list = list containing remaining function parameters 
+    name = filename for saving, should be unique if mode = save_group
+    variables = list containing name endings for each variable, if function returns multiple
+    mode = output type:
+        save_single - saves each instance of function output individually
+        save_group - saves all batched function outputs in a list
+        NA - returns all batched function outputs in a list, without saving
     """
+    
     from multiprocessing import Pool
     import numpy as np
-    pool = Pool(cores)
+    pool = Pool(cores) #number of cores
     count = 0
 
-    output_list = list(range((np.int(len(listlist)/cores))))
-    for i in range(len(output_list)):
-        paramlist_levels = list(range(cores))
-        for e in range(len(paramlist_levels)):
-            newlist = listlist[count:count+1]
-            newlist.extend(paramlist)
-            paramlist_levels[e] = newlist
+    batch_list = list(range((np.int(len(iter_list)/cores)))) #define number of batches
+    for i in range(len(batch_list)): #process each batch
+        cores_inputs = list(range(cores)) #define input for each core
+        for e in range(len(cores_inputs)):  
+            sub_iter_list = iter_list[count:count+1] #Find current iter value - add to subset iter_list
+            sub_iter_list.extend(param_list) #Append current iter value onto remaining parameter
+            cores_inputs[e] = sub_iter_list 
             count+=1
-        output_list[i] = pool.starmap(func, paramlist_levels)
+        batch_list[i] = pool.starmap(func, cores_inputs) #pool process on each core
 
+        if mode == 'save_single':
+            for t in range(cores):  #loop through each core in current loop
+                for s in range(len(variables)):
+                    save_var = batch_list[i][t].__dict__[variables[s]] #function output for current core in current batch
+                    save_name = name + '-' + str(cores_inputs[t][0]) + '-' + variables[s] #save name based on iterable parameter
+                    np.save(savepath + save_name, save_var)
 
-    #Append all calculated value together
-    if isinstance(output_list[0][0], int):
-        return(np.hstack(np.array(output_list)))
-    else:
-        return_list = list(range(len(output_list[0][0])))
-        new_array = np.vstack(np.array(output_list))
-        return([new_array[:,i] for i in range(new_array.shape[1])])
+    if mode != 'save_single':
+    
+        #Append all calculated values together
+        if len(variables) == 1:
+            if isinstance(batch_list[0][0].__dict__[variables[0]], int) or isinstance(batch_list[0][0].__dict__[variables[0]], float):
+                count=0
+                return_me = list(range(len(iter_list)))
+                for first in range(len(batch_list)):
+                    for second in range(len(batch_list[0])):
+                        return_me[count] = batch_list[first][second].__dict__[variables[0]]
+                        count+=1
 
-    return(return_list)
+        if len(variables) > 1:
+            count=0
+            return_me = list_of_list(len(variables),len(iter_list))
+            for first in range(len(batch_list)):
+                for second in range(len(batch_list[0])):
+                    for third in range(len(variables)):
+                        return_me[third][count] = batch_list[first][second].__dict__[variables[third]]
+                    count+=1
+        
+        if mode == 'save_group':
+            save_name = name
+            np.save(savepath + save_name, return_me)
+        
+        else:
+            return(return_me)
+        
+
         
 #=======================================================================================        
 def timeprint(per, r, numrows, name):
