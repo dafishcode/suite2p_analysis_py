@@ -49,31 +49,48 @@ def neighbour(cnt, savepath, experiment, rng, dim, name): # Select which fish da
 
 
 #=======================================================================
-def corrdis_bin(corr, dist, name, bins):
+def corrdis_bin(corr, dist, bins):
 #=======================================================================
     import numpy as np
     if corr.shape[0] != dist.shape[0]:
         print('Correlation and Distance matrices have unequal cell numbers')
-        exit()
-    corr = np.triu(corr, k=0)
+        return()
+    
+    # Take upper triangular of matrix and flatten into vector
+    corr = np.triu(corr, k=0) 
     dist = np.triu(dist, k=0)
     corr_v = corr.flatten()
     dist_v = dist.flatten()
 
+    # Convert all negative correlations to 0
     corr_v = [0 if o < 0 else o for o in corr_v]
     corr_v = np.array(corr_v)
     dist_v[np.where(corr_v == 0)] = 0
 
+    # Order by distances
     unq = np.unique(dist_v)
     dist_vs = np.sort(dist_v)
     corr_vs = np.array([x for _,x in sorted(zip(dist_v,corr_v))])
-    window = adfn.window(np.int((unq.shape[0]/bins)), unq.shape[0])
+    window = int(unq.shape[0]/bins)
 
+    #Loop through each bin and calculate average distance/correlation
     count, bincount=0,0
     dist_bins, corr_bins = np.zeros(np.int(unq.shape[0]/window)),np.zeros(np.int(unq.shape[0]/window))
     for i in range(np.int(unq.shape[0]/window)):
         if i == np.int(unq.shape[0]/window)-1:
-            break
+            start = count
+            stop = count+window
+            start_in = np.where(dist_vs == unq[start])[0][0] 
+
+            sumd_c = np.sum(corr_vs[start_in:])
+            div_c = len(np.where(corr_vs[start_in:] !=0)[0])
+            corr_bins[bincount] = sumd_c/div_c
+
+            sumd_d = np.sum(dist_vs[start_in:])
+            dist_bins[bincount] = sumd_d/div_c
+            return(np.vstack((dist_bins, corr_bins)))
+
+            
         start = count
         stop = count+window
         start_in = np.where(dist_vs == unq[start])[0][0] 
@@ -88,8 +105,6 @@ def corrdis_bin(corr, dist, name, bins):
 
         bincount+=1
         count+=window
-        adfn.timeprint(i, np.int(unq.shape[0]/window), name)
-
     return(np.vstack((dist_bins, corr_bins)))
     
     

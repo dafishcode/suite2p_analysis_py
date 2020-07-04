@@ -123,6 +123,7 @@ def divconq(kcoord, i, Fdrop, experiment, kcoordinput, kread):   # K-labels, coo
     print('Clustered fish ' + str(i + 1)+ ' of ' + str(len(kcoord)))
     return(nkl)
 
+
 #=====================
 #=====================
 class netsim: 
@@ -130,6 +131,9 @@ class netsim:
 #=====================
     """
     Class to perform network simulations
+    
+    dist = distance matrix between all nodes in network
+    
     """
 
     #========================
@@ -140,11 +144,14 @@ class netsim:
         self.dist = dist
     
     #====================================
-    def k_neighbours(self,edge_density):
+    def k_neighbours(self,edge_density, mode):
     #====================================
         import numpy as np
         """
         Form connections with k-nearest neighbours
+        
+        edge_density = number of neighbours to connect to
+        mode = directed or undirected
         """
         
         # Loop through rows of distance matrix to find k_neighbours
@@ -159,47 +166,90 @@ class netsim:
             #    k_neighbours = up
             neighbours = self.dist[row,].argsort()[:k_neighbours+1][::-1] #find neighbours 
             self.A[row,neighbours[:-1]] = 1 #make all edges of neighbours connected in network
-            self.A[neighbours[:-1],row] = 1
-        return self
+            
+            if mode == 'undirected':
+                self.A[neighbours[:-1],row] = 1
+        return(self)
+
     
     #=====================================
-    def ws_generate(self, edge_density, p):
+    def ws_generate(self, edge_density, p, mode):
     #=====================================
         """
         Generate random small world graph with specific Edge density. The Watts-Strogatz model has (i) a small average shortest path length, and (ii) a large clustering coefficient. The algorithm works by assigning a pre-defined number of connections between k-nearest neighbours - it then loops through each node and according to some uniform probability re-assigns its edges from its connected k-nearest neighbours and a random unconnected node. 
 
             edge_density = number of k_nearest neighbours each node is connected to
             p = probability of an edge being randomly re-assigned
-            Nnodes = number of nodes
-            dist = distance matrix between all nodes in network
+            mode = directed or undirected
         """
         import numpy as np
         import networkx as nx
         import random
         import copy
         
-        self.k_neighbours(edge_density)
+        if mode!= 'directed' and mode!= 'undirected': 
+            print('Select directed or undirected')
+            exit()
+            
+        self.k_neighbours(edge_density, mode)
 
         # Rewire connections with certain probability
         #-----------------------------------------------------------------------------
-        [rows, cols]    = np.where(np.triu(self.A) == 1) 
-        probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
-        edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
-        self.old_A  = copy.deepcopy(self.A) #create copy of A
+        
+        if mode == 'undirected':
+            [rows, cols]    = np.where(np.triu(self.A) == 1) 
+            probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
+            edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
+            self.old_A  = copy.deepcopy(self.A) #create copy of A
+            
+            for e in range(edges_to_change.shape[0]): #Loop through edges to change
+                this_edge = edges_to_change[e]
+                self.A[rows[this_edge], cols[this_edge]] = 0         # switch off old edge
+                self.A[cols[this_edge], rows[this_edge]] = 0
 
-        for e in range(edges_to_change.shape[0]): #Loop through edges to change
-            this_edge = edges_to_change[e]
-            self.A[rows[this_edge], cols[this_edge]] = 0         # switch off old edge
-            self.A[cols[this_edge], rows[this_edge]] = 0
+                where_0 = np.where(self.A[rows[this_edge]] == 0)[0] #find possible connections to reassign to
+                new_edge = random.choice(where_0[np.where(where_0 !=rows[this_edge])[0]]) #randomly choose one - ignoring any connections on the diagonal 
+                #Assign connection
+                self.A[rows[this_edge], new_edge] = 1        # switch on new edge
+                self.A[new_edge, rows[this_edge]] = 1
+        
+        if mode == 'directed':
+            [rows, cols]    = np.where(self.A == 1) 
+            probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
+            edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
+            self.old_A  = copy.deepcopy(self.A) #create copy of A
+        
+            # Rewire connections with certain probability
+            #-----------------------------------------------------------------------------
+            [rows, cols]    = np.where(self.A == 1) 
+            probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
+            edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
+            self.old_A  = copy.deepcopy(self.A) #create copy of A
 
-            where_0 = np.where(self.A[rows[this_edge]] == 0)[0] #find possible connections to reassign to
-            new_edge = random.choice(where_0[np.where(where_0 !=rows[this_edge])[0]]) #randomly choose one - ignoring any connections on the diagonal 
-            #Assign connection
-            self.A[rows[this_edge], new_edge] = 1        # switch on new edge
-            self.A[new_edge, rows[this_edge]] = 1
+            for e in range(edges_to_change.shape[0]): #Loop through edges to change
+                this_edge = edges_to_change[e]
+                self.A[rows[this_edge], cols[this_edge]] = 0         # switch off old edge
+
+                where_0 = np.where(self.A[rows[this_edge]] == 0)[0] #find possible connections to reassign to
+                new_edge = random.choice(where_0[np.where(where_0 !=rows[this_edge])[0]]) #randomly choose one - ignoring any connections on the diagonal 
+                #Assign connection
+                self.A[rows[this_edge], new_edge] = 1        # switch on new edge
         return(self)
 
     
+    #===========================
+    def cycles(self, edge_density, p, mode):
+    #===========================
+        import networkx as nx
+        import numpy as np
+        cyc_mat = self.ws_generate(edge_density, p, mode).A #matrix to calculate cycles
+        G = nx.from_numpy_matrix(cyc_mat)
+        cyc = nx.algorithms.cycle_basis(G)
+        edge =  int(np.sum(cyc_mat))
+        self.cycles = len(cyc)
+        self.edges = edge
+        
+        return(self)
 
 
 

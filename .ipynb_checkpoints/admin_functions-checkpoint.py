@@ -192,7 +192,7 @@ def parallel_class(cores, savepath, iter_list, func, param_list, name, variables
             cores_inputs[e] = sub_iter_list 
             count+=1
         batch_list[i] = pool.starmap(func, cores_inputs) #pool process on each core
-
+        
         if mode == 'save_single':
             for t in range(cores):  #loop through each core in current loop
                 for s in range(len(variables)):
@@ -211,6 +211,14 @@ def parallel_class(cores, savepath, iter_list, func, param_list, name, variables
                     for second in range(len(batch_list[0])):
                         return_me[count] = batch_list[first][second].__dict__[variables[0]]
                         count+=1
+            else:            
+                count=0
+                return_me = list_of_list(len(variables),len(iter_list))
+                for first in range(len(batch_list)):
+                    for second in range(len(batch_list[0])):
+                        for third in range(len(variables)):
+                            return_me[third][count] = batch_list[first][second].__dict__[variables[third]]
+                        count+=1       
 
         if len(variables) > 1:
             count=0

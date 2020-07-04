@@ -819,4 +819,98 @@ def order(datalist, n, cond, mode, block): # Select which fish data to visualise
                 sublist[count] = mylist[i]
                 count+=1
         return(sublist)
+    
+    
+#=============================    
+#=============================
+#PLOT AVALANCHES    
+#=============================
+#=============================
+# Create datalists
+#---------------------------------------------------------------------------
+experiment = 'PTZ-WILDTYPE'
+num = '02'
+os.chdir(Fdrop + 'Project/' + experiment)
+binlist = sorted(glob.glob('*E-' + num + '*cutbinarised.npy'))
+nnblist = sorted(glob.glob('*E-' + num + '*_nnb.npy')) 
+pkglist =  sorted(glob.glob('*E-' + num +'*pkg*')) 
+avlist =  sorted(glob.glob('*E-' + num + '*av*'))
+
+
+#Create time series plot for different avalanches
+import scipy.sparse as sp
+pkg = p20
+pkgs = sp.csr_matrix(p20)
+mark = np.unique(pkg, return_counts=True)[0][np.unique(pkg, return_counts=True)[1] > 5][1:] #RETAIN THIS LIST FOR PLOTTING REFERENCE - avalanches with more than 3 cells (can be 3 cells in one time frame, or 3 time frames one cell)
+avtime = list(range(mark.shape[0])) #list - each element = 2xarray - 1d: number of cells, 2d: frame number
+
+for t in range(mark.shape[0]):
+    avt = np.unique(sp.find(pkgs == mark[t])[1]) #unique time points
+    avary = np.zeros((2, len(avt))) #2xarray - 1d: number of cells, 2d: frame number
+    count = 0
+    for e in avt:
+        findmark = pkgs == mark[t]
+        avary[0,count] = len(sp.find(findmark)[0][np.where(sp.find(findmark)[1] == e)])
+        avary[1,count] = e
+        count+=1
+    avtime[t] = avary #avtime list is ordered from lowest avalanche number to highest (REMEMBER ONLY TAKING AVALANCHES WITH MORE THAN 2 CELLS)
+    
+    
+#Identify plotting interval
+amount = '[:,:3000]'
+#find range of avalanches in chosen plotting range
+for e in range(len(avtime)):
+    if np.max(avtime[e][1]) > 3000:
+        cutoff = e
+        break 
         
+# PLOT - average whole brain fluorescence
+#----------------------------------------
+experiment = 'PTZ-WILDTYPE'
+num = '02'
+os.chdir(Fdrop + 'Project/' + experiment)
+deltalist = sorted(glob.glob('*E-02*PTZ20*_deltaff.npy'))
+f, axarr = plt.subplots(figsize = (20,5))
+f.subplots_adjust(hspace=0)
+cut = eval('np.load(deltalist[0])' + amount)
+maxiar = []
+for i in range(cutoff):
+    plustime = np.min(avtime[i][1])
+    #plt.yscale('log')
+    plt.plot(np.append(np.zeros(np.int(plustime)),avtime[i][0]), alpha = 0.5)
+    maxiar = np.append(maxiar, avtime[i][0])
+    
+average = (np.apply_along_axis(np.mean, 0, cut))
+normav = average * (np.max(maxiar)/np.max(average))
+#plt.yscale('log')
+plt.plot(normav)
+plt.show()
+
+
+mini = 500
+count = 0
+avvec = []
+#find range of avalanches in chosen plotting range
+for e in range(len(avtime)):
+    if np.sum(avtime[e][0]) > mini:
+        avvec = np.append(avvec, e)
+        count+=1
+cutoff = count
+print(count)
+
+
+#PLOT AVALANCHEs
+#--------------
+avnum = 15
+markme = mark[np.int(avvec[avnum])]
+time = np.where(pkg == markme)[1]
+cells =  np.where(pkg == markme)[0]
+coordz = np.load(coordlist[0])
+fig, ax = plt.subplots(figsize= (10,10))
+master = plt.scatter(coordz[:,0], coordz[:,1], s=35, c = 'k', alpha = 0.1)
+dotplot = plt.scatter(coordz[cells][:,0], coordz[cells][:,1], c = time, cmap = 'Spectral_r', s=35, alpha = 1)
+fig.colorbar(dotplot, ax = None)
+fig.gca().set_aspect('equal', adjustable='box')
+os.chdir(Ffig)
+plt.savefig('avalanche_large.svg', transparent = True)
+plt.show()
