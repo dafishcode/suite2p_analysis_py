@@ -126,12 +126,11 @@ def divconq(kcoord, i, Fdrop, experiment, kcoordinput, kread):   # K-labels, coo
 
 #=====================
 #=====================
-class netsim: 
+class ws_netsim: 
 #=====================
 #=====================
     """
-    Class to perform network simulations
-    
+    Class to build watts-strogatz networks
     dist = distance matrix between all nodes in network
     
     """
@@ -140,11 +139,14 @@ class netsim:
     def __init__(self,dist):
     #========================
         import numpy as np
-        self.A = np.zeros(dist.shape)
         self.dist = dist
     
+
+    #BUILD NETWORK
+    #=================
+    #=================
     #====================================
-    def k_neighbours(self,edge_density, mode):
+    def k_neighbours(self, edge_density, mode):
     #====================================
         import numpy as np
         """
@@ -158,12 +160,6 @@ class netsim:
         #-----------------------------------------------------------------------------
         for row in range(self.dist.shape[0]):
             k_neighbours = int(self.A.shape[0] * edge_density) #Find k_neighbours for each cell
-            #down = int(k_neighbours)
-            #up= int(k_neighbours)+1
-            #if np.random.uniform(down, up) >= k_neighbours:
-            #    k_neighbours = down
-            #else:
-            #    k_neighbours = up
             neighbours = self.dist[row,].argsort()[:k_neighbours+1][::-1] #find neighbours 
             self.A[row,neighbours[:-1]] = 1 #make all edges of neighbours connected in network
             
@@ -171,9 +167,8 @@ class netsim:
                 self.A[neighbours[:-1],row] = 1
         return(self)
 
-    
     #=====================================
-    def ws_generate(self, edge_density, p, mode):
+    def net_generate(self, edge_density, p, mode):
     #=====================================
         """
         Generate random small world graph with specific Edge density. The Watts-Strogatz model has (i) a small average shortest path length, and (ii) a large clustering coefficient. The algorithm works by assigning a pre-defined number of connections between k-nearest neighbours - it then loops through each node and according to some uniform probability re-assigns its edges from its connected k-nearest neighbours and a random unconnected node. 
@@ -190,7 +185,7 @@ class netsim:
         if mode!= 'directed' and mode!= 'undirected': 
             print('Select directed or undirected')
             exit()
-            
+        self.A = np.zeros(self.dist.shape)
         self.k_neighbours(edge_density, mode)
 
         # Rewire connections with certain probability
@@ -200,7 +195,6 @@ class netsim:
             [rows, cols]    = np.where(np.triu(self.A) == 1) 
             probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
             edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
-            self.old_A  = copy.deepcopy(self.A) #create copy of A
             
             for e in range(edges_to_change.shape[0]): #Loop through edges to change
                 this_edge = edges_to_change[e]
@@ -217,14 +211,12 @@ class netsim:
             [rows, cols]    = np.where(self.A == 1) 
             probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
             edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
-            self.old_A  = copy.deepcopy(self.A) #create copy of A
         
             # Rewire connections with certain probability
             #-----------------------------------------------------------------------------
             [rows, cols]    = np.where(self.A == 1) 
             probs           = np.random.uniform(size = rows.shape[0]) #Generate random values for each connection 
             edges_to_change = np.where(probs <= p)[0] #see which values are randomly changed
-            self.old_A  = copy.deepcopy(self.A) #create copy of A
 
             for e in range(edges_to_change.shape[0]): #Loop through edges to change
                 this_edge = edges_to_change[e]
@@ -237,21 +229,159 @@ class netsim:
         return(self)
 
     
+    #CALCULATE CYCLES
+    #=================
+    #=================
     #===========================
-    def cycles(self, edge_density, p, mode):
+    def cycles_calculate(self, edge_density, p, mode):
     #===========================
         import networkx as nx
         import numpy as np
-        cyc_mat = self.ws_generate(edge_density, p, mode).A #matrix to calculate cycles
+        
+        cyc_mat = self.net_generate(edge_density, p, mode).A #matrix to calculate cycles
         G = nx.from_numpy_matrix(cyc_mat)
         cyc = nx.algorithms.cycle_basis(G)
         edge =  int(np.sum(cyc_mat))
         self.cycles = len(cyc)
         self.edges = edge
+        return(self)
         
+    #===========================
+    def cycles_median(self, edge_density, p, n_samp, mode):
+    #===========================
+    #select median cycles number for simulations - ensure you capture non-skewed cycle values
+        import networkx as nx
+        import numpy as np
+        cyc_list = list(range(n_samp)) #list containing cycle densities for each iteration
+        cyc_mat_list = list(range(n_samp)) #list containing each generated matrix
+        for i in range(n_samp):
+            curr_mat = self.net_generate(edge_density, p, mode).A #matrix to calculate cycles
+            G = nx.from_numpy_matrix(curr_mat)
+            cyc = nx.algorithms.cycle_basis(G)
+            edge =  int(np.sum(curr_mat))
+            cyc_mat_list[i] = curr_mat
+            cyc_list[i] = len(cyc)/edge
+        if n_samp % 2 == 0:
+            self.sim_A  = cyc_mat_list[min(range(len(cyc_list)), key=lambda x: abs(cyc_list[x]-np.median(cyc_list)))] #matrix to run simulation on
+
+        else:
+            self.sim_A  = cyc_mat_list[np.where(cyc_list == np.median(cyc_list))[0][0]] #matrix to run simulation on
+
+        return(self) 
+    
+    
+    #BUILD WEIGHT MATRIX
+    #===================
+    #===================
+    # Simple sigmoid function to 'soften' the exponential
+    #===========================
+    def sig(self, x):
+    #===========================
+        import numpy as np
+        self.sig_output = 1 / (1+np.exp(-x))
+        return(self)
+    
+    # Conversion from distance to edge weights, scaled (itself exponentially) by s
+    #====================================
+    def dist2edge(self, distance, divisor, soften, s):
+    #===================================
+        import numpy as np
+        self.edge_weight_out = np.exp(s/5)*self.sig(np.exp(-soften/np.exp(s)*distance)).sig_output/divisor
+        return(self)  
+    
+    #===========================
+    def adjmat_generate(self, s, edge_density, p, n_samp, divisor, soften, mode):
+    #===========================
+        import numpy as np
+        import copy
+        mat = np.zeros((self.dist.shape))
+        
+        curr_mat = self.cycles_median(edge_density, p, n_samp, mode).sim_A
+        
+        [rows, cols]    = np.where(np.triu(curr_mat) == 1) 
+        for e in range(len(rows)):
+            edge_weight = self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s).edge_weight_out
+            mat[rows[e], cols[e]] = edge_weight 
+            mat[cols[e], rows[e]] = edge_weight
+        self.adj_mat = copy.deepcopy(mat)
+            
+        return(self)
+    
+    
+    
+    #SIMULATE AVALANCHES
+    #===================
+    #===================
+    
+    #Find cells to propagate
+    #=====================================================
+    def propagate_neighbours(self, curr_mat, start_node):
+    #=====================================================
+        import numpy as np
+        self.prop_nodes = []
+        nodes = np.where(curr_mat[start_node] > 0) [0]
+        weights = curr_mat[start_node][nodes]
+        for f in range(len(nodes)):
+            if weights[f] > np.random.uniform(0, 1):
+                self.prop_nodes = np.append(self.prop_nodes, nodes[f])
         return(self)
 
+    
+    #Simulate 
+    #===========================
+    def simulate(self,  s, edge_density, p, n_samp, divisor, soften, cutoff, n_sims, mode):
+    #===========================
+        import numpy as np
+        curr_mat = self.adjmat_generate(s, edge_density, p, n_samp, divisor, soften, mode).adj_mat
 
+        self.av_size = []
+        self.av_dur = []
+
+        for i in range(n_sims):
+            #Decide start node
+            start_node = np.random.uniform(0, curr_mat.shape[0]-1)
+            down = int(start_node)
+            up= int(start_node)+1
+            if np.random.uniform(down, up) >= start_node:
+                start_node = up
+            else:
+                start_node = down
+
+
+            #Initialise avalanche - ping first node
+            t_nodes = self.propagate_neighbours(curr_mat, start_node).prop_nodes #Find connected neighbours > threshold
+            curr_list = t_nodes
+            iterate = 'yes'
+
+            if len(t_nodes) > 1: #must have at least 3 cells to begin avalanche
+                all_nodes = np.append(start_node, t_nodes)
+                timesteps = 1
+
+                while iterate == 'yes':
+                    tplus_nodes = []
+                    for z in range(len(curr_list)):
+                        #List of all nodes active in next timestep
+                        tplus_nodes = np.append(tplus_nodes, self.propagate_neighbours(curr_mat, int(curr_list[z])).prop_nodes)
+
+                    all_nodes = np.append(all_nodes, tplus_nodes)
+                    timesteps+=1
+                    curr_list = tplus_nodes
+
+                    if len(all_nodes) > cutoff:
+                        iterate = 'no'
+
+                    if len(tplus_nodes) == 0: #if no more active cells - stop
+                        iterate = 'no'
+
+
+                self.av_size = np.append(self.av_size, len(all_nodes)) 
+                self.av_dur = np.append(self.av_dur, timesteps)
+
+            else:
+                continue
+
+        return(self)
+    
 
 #ANALYSIS
 #------------
