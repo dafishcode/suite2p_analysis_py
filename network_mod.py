@@ -421,26 +421,10 @@ class ba_netsim:
             x=random.choice(seq)
             targets.add(x) #add method only adds if x is not already in target set
         return np.array(list(targets))
-
     
     #=====================================
-    def net_generate(self, edge_density):
+    def connect(self, edge_density, add_list):
     #=====================================
-        """
-        Generate Barabasi-Albert preferential attachment network. BA model starts with k initial nodes, and k edges 
-        - each new node will connect to k nodes with p(number of edges already connected to each node). 
-        
-            edge_density = number of edges of each node
-            
-        """
-        
-        import numpy as np
-        import networkx as nx
-        import random
-        import copy
-        
-        self.A = np.zeros(self.dist.shape) #initialise graph
-
         current_n = edge_density #current number of nodes
 
         # Nodes to connect to from current node
@@ -451,8 +435,9 @@ class ba_netsim:
 
         #iterate until number of nodes = n
         while current_n < self.dist.shape[0]:
-            self.A[current_n, nodes_out] = 1
-            self.A[nodes_out, current_n] = 1 
+            listlist = [current_n, nodes_out]
+            for t in range(len(add_list)):
+                self.A[listlist[add_list[t][0]],listlist[add_list[t][1]]] = 1
 
             #add current nodes receiving outgoing connections to node sequence
             node_counts.extend(nodes_out)
@@ -469,18 +454,42 @@ class ba_netsim:
             current_n +=1
         return(self)
     
-    
+    #=====================================
+    def net_generate(self, edge_density, mode):
+    #=====================================
+        """
+        Generate Barabasi-Albert preferential attachment network. BA model starts with k initial nodes, and k edges 
+        - each new node will connect to k nodes with p(number of edges already connected to each node). 
+        
+            edge_density = number of edges of each node
+            
+        """
+        import numpy as np
+        self.A = np.zeros(self.dist.shape) #initialise graph
+
+        if mode == 'undirected':
+            add_list = [[0,1], [1,0]]
+            self.connect(edge_density, add_list)
+
+        if mode == 'directed':
+            add_list = [[0,1]]
+            self.connect(edge_density, add_list)
+            add_list = [[1,0]]
+            self.connect(edge_density, add_list)
+                
+        return(self)
+            
     
     #CALCULATE CYCLES
     #=================
     #=================
     #===========================
-    def cycles_calculate(self, edge_density):
+    def cycles_calculate(self, edge_density, mode):
     #===========================
         import networkx as nx
         import numpy as np
         
-        cyc_mat = self.net_generate(edge_density).A #matrix to calculate cycles
+        cyc_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
         G = nx.from_numpy_matrix(cyc_mat)
         cyc = nx.algorithms.cycle_basis(G)
         edge =  int(np.sum(cyc_mat))
@@ -492,36 +501,29 @@ class ba_netsim:
     #BUILD WEIGHT MATRIX
     #===================
     #===================
-    # Simple sigmoid function to 'soften' the exponential
-    #===========================
-    def sig(self, x):
-    #===========================
-        import numpy as np
-        self.sig_output = 1 / (1+np.exp(-x))
-        return(self)
-    
+
     # Conversion from distance to edge weights, scaled (itself exponentially) by s
     #====================================
-    def dist2edge(self, distance, divisor, soften, s):
+    def dist2edge(self, distance, divisor, soften, s, r):
     #===================================
         import numpy as np
-        self.edge_weight_out = np.exp(s/5)*self.sig(np.exp(-soften/np.exp(s)*distance)).sig_output/divisor
+        self.edge_weight_out = (s + np.exp(-soften/np.exp(r)*distance))/divisor
         return(self)  
     
     #===========================
-    def adjmat_generate(self, s, edge_density, divisor, soften):
+    def adjmat_generate(self, edge_density, s, r, divisor, soften, mode):
     #===========================
         import numpy as np
         import copy
         mat = np.zeros((self.dist.shape))
         
-        curr_mat = self.net_generate(edge_density).A #matrix to calculate cycles
+        curr_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
         
-        [rows, cols]    = np.where(np.triu(curr_mat) == 1) 
+        [rows, cols]    = np.where(curr_mat == 1) 
         for e in range(len(rows)):
-            edge_weight = self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s).edge_weight_out
+            edge_weight = self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out
             mat[rows[e], cols[e]] = edge_weight 
-            mat[cols[e], rows[e]] = edge_weight
+                
         self.adj_mat = copy.deepcopy(mat)
             
         return(self)
@@ -534,7 +536,7 @@ class ba_netsim:
     
     #Find cells to propagate
     #=====================================================
-    def propagate_neighbours(self, curr_mat, start_node, r_e):
+    def propagate_neighbours(self, curr_mat, start_node):
     #=====================================================
         import numpy as np
         self.prop_nodes = []
@@ -543,9 +545,7 @@ class ba_netsim:
         for f in range(len(nodes)):
             if weights[f] > np.random.uniform(0, 1):
                 self.prop_nodes = np.append(self.prop_nodes, nodes[f])
-                
-        if r_e > np.random.uniform(0,1):
-            self.prop_nodes = np.append(self.prop_nodes, start_node)
+
         return(self)
 
     
@@ -554,13 +554,7 @@ class ba_netsim:
     def simulate(self,  s, edge_density, max_e, divisor, soften, cutoff, n_sims, iterate):
     #===========================
         import numpy as np
-        curr_mat = self.adjmat_generate(s, edge_density, divisor, soften).adj_mat
-        degree = sum(self.A)
-        degree_scaled = (max_e/max(degree)) * degree 
-        
-        
-
-
+        curr_mat = self.adjmat_generate(s, edge_density, divisor, soften, mode).adj_mat
         
         self.av_size = []
         self.av_dur = []
