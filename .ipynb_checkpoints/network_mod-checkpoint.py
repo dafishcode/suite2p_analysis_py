@@ -607,3 +607,222 @@ class ba_netsim:
 
         return(self)
     
+#=====================
+#=====================
+class ba1_netsim: 
+#=====================
+#=====================
+    """
+    Class to build barabasi-albert networks and run avalanche simulations
+    dist = distance matrix between all nodes in network
+    """
+
+    #========================
+    def __init__(self,dist):
+    #========================
+        import numpy as np
+        self.dist = dist
+    
+
+    #BUILD NETWORK
+    #=================
+    #=================
+    
+    #=====================================
+    def sample(self, seq, m):
+    #=====================================
+        """ Return m unique elements from seq.
+        """
+        import random
+        import numpy as np
+        
+        #make targets a set - only contains unique elements
+        targets=set()
+        while len(targets)<m:
+            x=random.choice(seq)
+            targets.add(x) #add method only adds if x is not already in target set
+        return np.array(list(targets))
+    
+    #=====================================
+    def connect(self, edge_density, add_list):
+    #=====================================
+        current_n = edge_density #current number of nodes
+
+        # Nodes to connect to from current node
+        nodes_out =list(range(edge_density))
+
+        # Sequence of all nodes connected (in and out) - can sample from this 
+        node_counts=[]
+
+        #iterate until number of nodes = n
+        while current_n < self.dist.shape[0]:
+            listlist = [current_n, nodes_out]
+            for t in range(len(add_list)):
+                self.A[listlist[add_list[t][0]],listlist[add_list[t][1]]] = 1
+
+            #add current nodes receiving outgoing connections to node sequence
+            node_counts.extend(nodes_out)
+
+            #list of incoming connections for current node - i.e. repeated sequence of current node
+            nodes_in = [current_n]*edge_density
+
+            #add current node (as many times as it sends out connections - assumes undirected network) to node sequence
+            node_counts.extend(nodes_in)
+
+            #update nodes_out - uniformly sample from sequence of node_counts
+            nodes_out = self.sample(node_counts, edge_density)
+
+            current_n +=1
+        return(self)
+    
+    #=====================================
+    def net_generate(self, edge_density, mode):
+    #=====================================
+        """
+        Generate Barabasi-Albert preferential attachment network. BA model starts with k initial nodes, and k edges 
+        - each new node will connect to k nodes with p(number of edges already connected to each node). 
+        
+            edge_density = number of edges of each node
+            
+        """
+        import numpy as np
+        self.A = np.zeros(self.dist.shape) #initialise graph
+
+        if mode == 'undirected':
+            add_list = [[0,1], [1,0]]
+            self.connect(edge_density, add_list)
+
+        if mode == 'directed':
+
+            add_list = [[1,0]]
+            self.connect(edge_density, add_list)
+                
+        return(self)
+            
+    
+    #CALCULATE CYCLES
+    #=================
+    #=================
+    #===========================
+    def cycles_calculate(self, edge_density, mode):
+    #===========================
+        import networkx as nx
+        import numpy as np
+        
+        cyc_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
+        G = nx.from_numpy_matrix(cyc_mat)
+        cyc = nx.algorithms.cycle_basis(G)
+        edge =  int(np.sum(cyc_mat))
+        self.cycles = len(cyc)
+        self.edges = edge
+        return(self)
+    
+    
+    #BUILD WEIGHT MATRIX
+    #===================
+    #===================
+
+    # Conversion from distance to edge weights, scaled (itself exponentially) by s
+    #====================================
+    def dist2edge(self, distance, divisor, soften, s, r):
+    #===================================
+        import numpy as np
+        self.edge_weight_out = (s + np.exp(-soften/np.exp(r)*distance))/divisor
+        return(self)  
+    
+    #===========================
+    def adjmat_generate(self, edge_density, s, r, divisor, soften, mode):
+    #===========================
+        import numpy as np
+        import copy
+        mat = np.zeros((self.dist.shape))
+        
+        curr_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
+        
+        [rows, cols]    = np.where(curr_mat == 1) 
+        for e in range(len(rows)):
+            edge_weight = self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out
+            mat[rows[e], cols[e]] = edge_weight 
+                
+        self.adj_mat = copy.deepcopy(mat)
+            
+        return(self)
+    
+    
+    
+    #SIMULATE AVALANCHES
+    #===================
+    #===================
+    
+    #Find cells to propagate
+    #=====================================================
+    def propagate_neighbours(self, curr_mat, start_node):
+    #=====================================================
+        import numpy as np
+        self.prop_nodes = []
+        nodes = np.where(curr_mat[start_node] > 0) [0]
+        weights = curr_mat[start_node][nodes]
+        for f in range(len(nodes)):
+            if weights[f] > np.random.uniform(0, 1):
+                self.prop_nodes = np.append(self.prop_nodes, nodes[f])
+
+        return(self)
+
+    
+    #Simulate 
+    #===========================
+    def simulate(self,  s, edge_density, max_e, divisor, soften, cutoff, n_sims, iterate):
+    #===========================
+        import numpy as np
+        curr_mat = self.adjmat_generate(s, edge_density, divisor, soften, mode).adj_mat
+        
+        self.av_size = []
+        self.av_dur = []
+        
+        #iterate simulation calculation for less-noisy distribution
+        for x in range(iterate):
+            
+            for i in range(n_sims):
+                #Decide start node
+                start_node = np.random.uniform(0, curr_mat.shape[0]-1)
+                down = int(start_node)
+                up= int(start_node)+1
+                if np.random.uniform(down, up) >= start_node:
+                    start_node = up
+                else:
+                    start_node = down
+
+
+                #Initialise avalanche - ping first node
+                t_nodes = self.propagate_neighbours(curr_mat, start_node, degree_scaled[start_node]).prop_nodes #Find connected neighbours > threshold
+                curr_list = t_nodes
+                iterate = 'yes'
+
+                if len(t_nodes) > 1: #must have at least 3 cells to begin avalanche
+                    all_nodes = np.append(start_node, t_nodes)
+                    timesteps = 1
+
+                    while iterate == 'yes':
+                        tplus_nodes = []
+                        for z in range(len(curr_list)):
+                            #List of all nodes active in next timestep
+                            tplus_nodes = np.append(tplus_nodes, self.propagate_neighbours(curr_mat, int(curr_list[z]), degree_scaled[int(curr_list[z])]).prop_nodes)
+
+                        all_nodes = np.append(all_nodes, tplus_nodes)
+                        timesteps+=1
+                        curr_list = tplus_nodes
+
+                        if len(all_nodes) > cutoff:
+                            iterate = 'no'
+
+                        if len(tplus_nodes) == 0: #if no more active cells - stop
+                            iterate = 'no'
+
+
+                    self.av_size = np.append(self.av_size, len(all_nodes)) 
+                    self.av_dur = np.append(self.av_dur, timesteps)
+
+                else:
+                    continue
+
+        return(self)

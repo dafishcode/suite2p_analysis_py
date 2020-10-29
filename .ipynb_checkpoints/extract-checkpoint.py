@@ -295,7 +295,7 @@ def bcl_function_parameters(wdt, savepath, experiment, name, file, lamb, varB, v
         #np.save(savepath + 'Project/' + experiment + os.sep + name[:name.find('run')+6] + '_' + 'modelcal.npy', carray)  
         #np.save(savepath + 'Project/' + experiment + os.sep + name[:name.find('run')+6] + '_' + 'binarised.npy', sksarray)  
 
-        #np.save(savepath + 'Project/' + experiment + os.sep + name + '_' + 'binarised.npy', sksarray)  
+        np.save(savepath + 'Project/' + experiment + os.sep + name + '_' + 'binarised.npy', sksarray)  
         return carray,sksarray, Barray
 
     if mode == 'see':
