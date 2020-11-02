@@ -1,3 +1,5 @@
+import avalanches as crfn
+
 #PROCESS
 #------------
 #------------
@@ -606,223 +608,108 @@ class ba_netsim:
                     continue
 
         return(self)
-    
-#=====================
-#=====================
-class ba1_netsim: 
-#=====================
-#=====================
-    """
-    Class to build barabasi-albert networks and run avalanche simulations
-    dist = distance matrix between all nodes in network
-    """
-
-    #========================
-    def __init__(self,dist):
-    #========================
-        import numpy as np
-        self.dist = dist
-    
-
-    #BUILD NETWORK
-    #=================
-    #=================
-    
-    #=====================================
-    def sample(self, seq, m):
-    #=====================================
-        """ Return m unique elements from seq.
-        """
-        import random
-        import numpy as np
-        
-        #make targets a set - only contains unique elements
-        targets=set()
-        while len(targets)<m:
-            x=random.choice(seq)
-            targets.add(x) #add method only adds if x is not already in target set
-        return np.array(list(targets))
-    
-    #=====================================
-    def connect(self, edge_density, add_list):
-    #=====================================
-        current_n = edge_density #current number of nodes
-
-        # Nodes to connect to from current node
-        nodes_out =list(range(edge_density))
-
-        # Sequence of all nodes connected (in and out) - can sample from this 
-        node_counts=[]
-
-        #iterate until number of nodes = n
-        while current_n < self.dist.shape[0]:
-            listlist = [current_n, nodes_out]
-            for t in range(len(add_list)):
-                self.A[listlist[add_list[t][0]],listlist[add_list[t][1]]] = 1
-
-            #add current nodes receiving outgoing connections to node sequence
-            node_counts.extend(nodes_out)
-
-            #list of incoming connections for current node - i.e. repeated sequence of current node
-            nodes_in = [current_n]*edge_density
-
-            #add current node (as many times as it sends out connections - assumes undirected network) to node sequence
-            node_counts.extend(nodes_in)
-
-            #update nodes_out - uniformly sample from sequence of node_counts
-            nodes_out = self.sample(node_counts, edge_density)
-
-            current_n +=1
-        return(self)
-    
-    #=====================================
-    def net_generate(self, edge_density, mode):
-    #=====================================
-        """
-        Generate Barabasi-Albert preferential attachment network. BA model starts with k initial nodes, and k edges 
-        - each new node will connect to k nodes with p(number of edges already connected to each node). 
-        
-            edge_density = number of edges of each node
-            
-        """
-        import numpy as np
-        self.A = np.zeros(self.dist.shape) #initialise graph
-
-        if mode == 'undirected':
-            add_list = [[0,1], [1,0]]
-            self.connect(edge_density, add_list)
-
-        if mode == 'directed':
-
-            add_list = [[1,0]]
-            self.connect(edge_density, add_list)
-                
-        return(self)
-            
-    
-    #CALCULATE CYCLES
-    #=================
-    #=================
-    #===========================
-    def cycles_calculate(self, edge_density, mode):
-    #===========================
-        import networkx as nx
-        import numpy as np
-        
-        cyc_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
-        G = nx.from_numpy_matrix(cyc_mat)
-        cyc = nx.algorithms.cycle_basis(G)
-        edge =  int(np.sum(cyc_mat))
-        self.cycles = len(cyc)
-        self.edges = edge
-        return(self)
-    
-    
-    #BUILD WEIGHT MATRIX
-    #===================
-    #===================
-
-    # Conversion from distance to edge weights, scaled (itself exponentially) by s
-    #====================================
-    def dist2edge(self, distance, divisor, soften, s, r):
-    #===================================
-        import numpy as np
-        self.edge_weight_out = (s + np.exp(-soften/np.exp(r)*distance))/divisor
-        return(self)  
-    
-    #===========================
-    def adjmat_generate(self, edge_density, s, r, divisor, soften, mode):
-    #===========================
-        import numpy as np
-        import copy
-        mat = np.zeros((self.dist.shape))
-        
-        curr_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
-        
-        [rows, cols]    = np.where(curr_mat == 1) 
-        for e in range(len(rows)):
-            edge_weight = self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out
-            mat[rows[e], cols[e]] = edge_weight 
-                
-        self.adj_mat = copy.deepcopy(mat)
-            
-        return(self)
-    
-    
-    
-    #SIMULATE AVALANCHES
-    #===================
-    #===================
-    
-    #Find cells to propagate
-    #=====================================================
-    def propagate_neighbours(self, curr_mat, start_node):
-    #=====================================================
-        import numpy as np
-        self.prop_nodes = []
-        nodes = np.where(curr_mat[start_node] > 0) [0]
-        weights = curr_mat[start_node][nodes]
-        for f in range(len(nodes)):
-            if weights[f] > np.random.uniform(0, 1):
-                self.prop_nodes = np.append(self.prop_nodes, nodes[f])
-
-        return(self)
 
     
-    #Simulate 
-    #===========================
-    def simulate(self,  s, edge_density, max_e, divisor, soften, cutoff, n_sims, iterate):
-    #===========================
-        import numpy as np
-        curr_mat = self.adjmat_generate(s, edge_density, divisor, soften, mode).adj_mat
-        
-        self.av_size = []
-        self.av_dur = []
-        
-        #iterate simulation calculation for less-noisy distribution
-        for x in range(iterate):
-            
-            for i in range(n_sims):
-                #Decide start node
-                start_node = np.random.uniform(0, curr_mat.shape[0]-1)
-                down = int(start_node)
-                up= int(start_node)+1
-                if np.random.uniform(down, up) >= start_node:
-                    start_node = up
-                else:
-                    start_node = down
+
+#Bin spike data
+#==================================
+def bin_data(spikes, N, sim_time):
+#==================================
+    import numpy as np
+    bin_dat = np.zeros((N, sim_time))
+    for i in range(N):
+        bin_dat[i][np.unique((np.asarray(spikes[i])*1000).astype(int))] = 1
+    return(bin_dat)
+
+#Run spiking net
+#===============================================================================
+def run_net(sim_time, k, v_th, r, s, divisor, soften, N, dist, v_rest, t_syn_del, tau_l, N_e, lam, w_e):
+#===============================================================================
+    import brian2 as b2
+    from random import sample
+    from numpy import random
+    import numpy as np
+    
+    b2.start_scope()
+    
+    # define dynamics for each cell
+    lif ="""
+    dv/dt = -(v-v_rest) / tau_l : 1 """
+    net_dyn = b2.NeuronGroup(
+    N, model=lif,
+    threshold="v>v_th", reset="v = v_rest",
+    method="euler")
+    net_dyn.v = v_rest #set starting value for voltage
+
+    p_input = b2.PoissonInput(net_dyn, "v", N_e,lam, w_e)
+    
+    #Network connectivity + weights
+    curr = ba_netsim(dist).adjmat_generate(k, s, r, divisor, soften, 'directed')
+    A = curr.A
+    W = curr.adj_mat
+
+    #Build synapses
+    net_syn = b2.Synapses(net_dyn, net_dyn, 'w:1', on_pre="v+=w", delay=t_syn_del)
+    rows, cols = np.nonzero(A)
+    net_syn.connect(i = rows, j = cols)
+    net_syn.w = W[rows, cols]
+
+    spike_monitor = b2.SpikeMonitor(net_dyn)
+    V = b2.StateMonitor(net_dyn, 'v', record=True)
+    b2.run(sim_time*b2.ms)
+    spikes = spike_monitor.spike_trains()
+    volt = np.asarray(V.v)
+    bind = bin_data(spikes, N, sim_time)
+    
+    return(bind, spikes, volt, spike_monitor )
+
+#==============================
+def ks_log(empirical, model): #Find the distance between 2 distributions in log space
+#==============================
+    import numpy as np
+    import matplotlib
+    from matplotlib import pyplot as plt
+    fig, axarr = plt.subplots(figsize = (5,3))
+    binvec = np.append(empirical,model)
+    mini = np.min(binvec)
+    maxi = np.max(binvec)
+    bins = 100000
+    model_hist = axarr.hist(model, bins=bins, range = (mini, maxi), density=True, histtype='step', linewidth = 1.5, cumulative=-1)
+    model_xaxis = np.log10(model_hist[1])
+    model_yaxis = np.log10(model_hist[0])
+
+    emp_hist = axarr.hist(empirical, bins=bins, range = (mini, maxi), density=True, histtype='step', linewidth = 1.5, cumulative=-1)
+    emp_xaxis = np.log10(emp_hist[1])
+    emp_yaxis = np.log10(emp_hist[0])
+
+    mod_inf = np.where(model_yaxis == float('-inf'))[0]
+    emp_inf = np.where(emp_yaxis == float('-inf'))[0]
+
+    if len(emp_inf) == 0:
+        end_index = mod_inf[0] 
 
 
-                #Initialise avalanche - ping first node
-                t_nodes = self.propagate_neighbours(curr_mat, start_node, degree_scaled[start_node]).prop_nodes #Find connected neighbours > threshold
-                curr_list = t_nodes
-                iterate = 'yes'
+    elif len(mod_inf) == 0:
+        end_index = emp_inf[0] 
 
-                if len(t_nodes) > 1: #must have at least 3 cells to begin avalanche
-                    all_nodes = np.append(start_node, t_nodes)
-                    timesteps = 1
-
-                    while iterate == 'yes':
-                        tplus_nodes = []
-                        for z in range(len(curr_list)):
-                            #List of all nodes active in next timestep
-                            tplus_nodes = np.append(tplus_nodes, self.propagate_neighbours(curr_mat, int(curr_list[z]), degree_scaled[int(curr_list[z])]).prop_nodes)
-
-                        all_nodes = np.append(all_nodes, tplus_nodes)
-                        timesteps+=1
-                        curr_list = tplus_nodes
-
-                        if len(all_nodes) > cutoff:
-                            iterate = 'no'
-
-                        if len(tplus_nodes) == 0: #if no more active cells - stop
-                            iterate = 'no'
+    else: 
+        end_index = len(emp_inf)
 
 
-                    self.av_size = np.append(self.av_size, len(all_nodes)) 
-                    self.av_dur = np.append(self.av_dur, timesteps)
+    diff_vec = abs(abs(model_yaxis[:end_index]) - abs(emp_yaxis[:end_index ]))
 
-                else:
-                    continue
+    cost_max, cost_mean = np.max(diff_vec), np.mean(diff_vec)
+    return(cost_max, cost_mean)
 
-        return(self)
+
+#Calculate number of simulatons to do - to have 95% chance of generating maximum avalanche
+def num_sims(empirical, cutoff):
+    import matplotlib.pyplot as plt
+    import math
+    fig, axarr = plt.subplots(figsize = (7,5))
+    hist = axarr.hist(empirical, bins = 100000, density = True, histtype = 'step', cumulative = -1)
+    p = 1-(10**(np.log10(hist[0])[np.where(np.log10(hist[1]) > np.log10(cutoff))[0][0]])) #probability of getting avalanches of size cutoff or smaller
+    number = 0.05 
+    base = p
+    exponent = int(math.log(number, base)) #number of simulations as the power to which p is raised to get 95% probability 
+    return(exponent)
