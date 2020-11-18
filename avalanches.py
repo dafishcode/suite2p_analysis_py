@@ -210,7 +210,7 @@ def avalanche_r(nnb, bind): # duration = yes convergence (no back propagation, e
                 if t < 30:
                     time = t-1
                 
-                elif t>30:
+                if t > 29:
                     time = 30
                         
                 for e in range(convertav.shape[0]):
@@ -335,7 +335,7 @@ def avalanche(nnb, bind, savepath,experiment): # duration = yes convergence (no 
                 if t < 30:
                     time = t-1
                 
-                elif t>30:
+                if t > 29:
                     time = 30
                         
                 for e in range(convertav.shape[0]):

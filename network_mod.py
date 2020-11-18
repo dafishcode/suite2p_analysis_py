@@ -535,80 +535,89 @@ class ba_netsim:
     #SIMULATE AVALANCHES
     #===================
     #===================
-    
+
+    #Randomly select start node
+    #===========================================
+    def find_start_nodes(self, input_size, curr_mat):
+    #===========================================
+        import random
+        import numpy as np
+        start_nodes=set()
+        for i in range(input_size):
+            x = random.choice(np.arange(0,curr_mat.shape[0]))
+            start_nodes.add(x)
+            self.start_nodes = np.array(list(start_nodes))
+        return(self)
+
+
     #Find cells to propagate
     #=====================================================
-    def propagate_neighbours(self, curr_mat, start_node):
+    def propagate_neighbours(self, curr_mat, start_node, thresh):
     #=====================================================
         import numpy as np
         self.prop_nodes = []
         nodes = np.where(curr_mat[start_node] > 0) [0]
         weights = curr_mat[start_node][nodes]
         for f in range(len(nodes)):
-            if weights[f] > np.random.uniform(0, 1):
+            if weights[f] > np.random.uniform(0, thresh):
                 self.prop_nodes = np.append(self.prop_nodes, nodes[f])
-
         return(self)
 
-    
-    #Simulate 
+
+
+
+    #Ping node
     #===========================
-    def simulate(self,  s, edge_density, max_e, divisor, soften, cutoff, n_sims, iterate):
+    def ping(self,  edge_density, r, s, divisor, soften, mode, n_sims, thresh, input_size):
     #===========================
         import numpy as np
-        curr_mat = self.adjmat_generate(s, edge_density, divisor, soften, mode).adj_mat
-        
+        curr_mat = self.adjmat_generate(edge_density, s, r,  divisor, soften, mode).adj_mat
+
         self.av_size = []
         self.av_dur = []
-        
-        #iterate simulation calculation for less-noisy distribution
-        for x in range(iterate):
-            
-            for i in range(n_sims):
-                #Decide start node
-                start_node = np.random.uniform(0, curr_mat.shape[0]-1)
-                down = int(start_node)
-                up= int(start_node)+1
-                if np.random.uniform(down, up) >= start_node:
-                    start_node = up
-                else:
-                    start_node = down
 
+        #Simulate multiple times and take average for each input
+        for i in range(n_sims):
+            allstart_nodes = self.find_start_nodes(input_size, curr_mat).start_nodes
+            t_nodes = [] #nodes at current time step activated
 
+            #Find all nodes activate by pinged nodes
+            for i in range(len(allstart_nodes)):
                 #Initialise avalanche - ping first node
-                t_nodes = self.propagate_neighbours(curr_mat, start_node, degree_scaled[start_node]).prop_nodes #Find connected neighbours > threshold
-                curr_list = t_nodes
+                start_node = allstart_nodes[i]
+                t_nodes = np.append(t_nodes, self.propagate_neighbours(curr_mat, start_node, thresh).prop_nodes) #Find connected neighbours > threshold
+
+            curr_list = t_nodes
+
+            if len(t_nodes) > 1: #must have at least 3 cells to begin avalanche
                 iterate = 'yes'
+                all_nodes = t_nodes
+                timesteps = 1
 
-                if len(t_nodes) > 1: #must have at least 3 cells to begin avalanche
-                    all_nodes = np.append(start_node, t_nodes)
-                    timesteps = 1
+                while iterate == 'yes':
+                    tplus_nodes = []
+                    for z in range(len(curr_list)):
+                        #List of all nodes active in next timestep
+                        tplus_nodes = np.append(tplus_nodes, self.propagate_neighbours(curr_mat, int(curr_list[z]), thresh).prop_nodes)
 
-                    while iterate == 'yes':
-                        tplus_nodes = []
-                        for z in range(len(curr_list)):
-                            #List of all nodes active in next timestep
-                            tplus_nodes = np.append(tplus_nodes, self.propagate_neighbours(curr_mat, int(curr_list[z]), degree_scaled[int(curr_list[z])]).prop_nodes)
+                    all_nodes = np.append(all_nodes, tplus_nodes)
+                    timesteps+=1
+                    curr_list = tplus_nodes
 
-                        all_nodes = np.append(all_nodes, tplus_nodes)
-                        timesteps+=1
-                        curr_list = tplus_nodes
+                    #if len(all_nodes) > cutoff:
+                    #    iterate = 'no'
 
-                        if len(all_nodes) > cutoff:
-                            iterate = 'no'
+                    if len(tplus_nodes) == 0: #if no more active cells - stop
+                        iterate = 'no'
 
-                        if len(tplus_nodes) == 0: #if no more active cells - stop
-                            iterate = 'no'
-
-
-                    self.av_size = np.append(self.av_size, len(all_nodes)) 
-                    self.av_dur = np.append(self.av_dur, timesteps)
-
-                else:
-                    continue
-
+                self.av_size = np.append(self.av_size, len(all_nodes)) 
+                self.av_dur = np.append(self.av_dur, timesteps)
+            else:
+                continue
+        
+        
+        
         return(self)
-
     
 
 #Bin spike data
@@ -684,21 +693,22 @@ def ks_log(empirical, model): #Find the distance between 2 distributions in log 
 
     mod_inf = np.where(model_yaxis == float('-inf'))[0]
     emp_inf = np.where(emp_yaxis == float('-inf'))[0]
+    plt.close(fig)
+        
+    if len(emp_inf) == 0 and len(mod_inf) == 0:
+        end_index = len(emp_inf)
 
-    if len(emp_inf) == 0:
+    elif len(emp_inf) == 0:
         end_index = mod_inf[0] 
-
 
     elif len(mod_inf) == 0:
         end_index = emp_inf[0] 
-
-    else: 
-        end_index = len(emp_inf)
-
+        
 
     diff_vec = abs(abs(model_yaxis[:end_index]) - abs(emp_yaxis[:end_index ]))
 
     cost_max, cost_mean = np.max(diff_vec), np.mean(diff_vec)
+
     return(cost_max, cost_mean)
 
 
