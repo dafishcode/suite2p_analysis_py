@@ -297,7 +297,7 @@ class ws_netsim:
         import numpy as np
         import copy
         mat = np.zeros((self.dist.shape))
-        
+    
         curr_mat = self.cycles_median(edge_density, p, n_samp, mode).sim_A
         
         [rows, cols]    = np.where(np.triu(curr_mat) == 1) 
@@ -309,7 +309,7 @@ class ws_netsim:
             
         return(self)
     
-    
+
     
     #SIMULATE AVALANCHES
     #===================
@@ -522,8 +522,15 @@ class ba_netsim:
         curr_mat = self.net_generate(edge_density, mode).A #matrix to calculate cycles
         
         [rows, cols]    = np.where(curr_mat == 1) 
+        
+        
+        full_distance = np.linspace(0, np.max(self.dist), 300)
+        sumto = np.sum(self.dist2edge(full_distance, divisor, soften, s, 0).edge_weight_out)
+        curr_sum = np.sum(self.dist2edge(full_distance, divisor, soften, s, r).edge_weight_out)
+        factor = sumto/curr_sum
+        
         for e in range(len(rows)):
-            edge_weight = self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out
+            edge_weight = (self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out* factor)
             mat[rows[e], cols[e]] = edge_weight 
                 
         self.adj_mat = copy.deepcopy(mat)
@@ -671,6 +678,44 @@ def run_net(sim_time, k, v_th, r, s, divisor, soften, N, dist, v_rest, t_syn_del
     bind = bin_data(spikes, N, sim_time)
     
     return(bind, spikes, volt, spike_monitor )
+
+
+
+#==============================
+def MSE(empirical, model, alpha): #Find the MSE between 2 distributions in log space - alpha = 0.4
+#==============================
+    import numpy as np
+    import matplotlib
+    from matplotlib import pyplot as plt
+    fig, axarr = plt.subplots(figsize = (5,3))
+
+    binvec = np.append(empirical,model)
+    mini = np.min(binvec)
+    maxi = np.max(binvec)
+    bins = 100000
+    mod_hist = axarr.hist(model, bins=bins, range = (mini, maxi), density=True, histtype='step', linewidth = 1.5, cumulative=-1)
+    mod_xaxis = np.log10(mod_hist[1])
+    mod_yaxis = np.log10(mod_hist[0])
+    emp_hist = axarr.hist(empirical, bins=bins, range = (mini, maxi), density=True, histtype='step', linewidth = 1.5, cumulative=-1)
+    emp_xaxis = np.log10(emp_hist[1])
+    emp_yaxis = np.log10(emp_hist[0])
+
+
+    plt.close(fig)
+    diff_sq = (emp_yaxis - mod_yaxis)**2
+    end_index = np.where(diff_sq == float('inf'))[0][0]
+    diff_sq_full = diff_sq[:end_index]
+    MSE = np.sum(diff_sq_full)/ len(diff_sq_full)
+
+    res = emp_yaxis - mod_yaxis
+    res_full = res[:end_index]
+    var_res = np.sum((res_full - np.mean(res_full))**2)/len(res_full)
+    
+    empty_bins = bins - end_index
+    Beta = (empty_bins *(10**-5))
+    MSE_B = MSE + np.exp(Beta)*alpha
+    return(MSE_B, MSE, var_res)
+
 
 #==============================
 def ks_log(empirical, model): #Find the distance between 2 distributions in log space
