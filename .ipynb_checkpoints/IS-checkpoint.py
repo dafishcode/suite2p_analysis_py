@@ -37,7 +37,7 @@ def LogLikelihood_LN(mu,sig, sizes, M , a, b):
 #IMPORTANCE SAMPLER - for power law - monte carlo sampling from two different distributions
 #OUTPUT - posterior average exponent, log marginal likelihood, effective sample size = how good is the sampler
 def IS(npart, sizes, M, a, b):
-    lambda_sample=np.random.uniform(0.1,5,npart) #randomly sample 
+    lambda_sample=np.random.uniform(0.1,5,npart) #randomly sample lambda (exponent values)
 
     #Weights - loglikelihoods of your data for each lambda * (weight by) log probability of drawing each lambda sample from the prior, divided by log probability of drawing each lambda sample from the proposal
     #Likelihood of data weighted by prior expectation of lambda, and proposal expected lambda - cancel out the effect of the proposal
@@ -56,7 +56,7 @@ def IS(npart, sizes, M, a, b):
 def IS_LN(npart, sizes, M, a, b):
     mu_sample = np.random.uniform(-2.0,2.0,npart) #randomly sample mu
     sig_sample = np.random.uniform(0.1,5.0,npart) #randomly sample sigma
-    weights=LogLikelihood_LN(mu_sample,sig_sample, sizes, M, a, b)
+    weights=LogLikelihood_LN(mu_sample,sig_sample, sizes, M, a, b) #Add in prior + proposal?
     maxw=np.max(weights)
     w2 = np.exp(weights-maxw)
     w2_sum = np.sum(w2)

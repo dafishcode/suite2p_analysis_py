@@ -95,7 +95,7 @@ def mean_distribution(distlist): #Generate mean distribution
     for i in range(len(distlist)):
         comb_vec = np.append(comb_vec, distlist[i])
     av = np.unique(comb_vec, return_counts=True)[0]
-    freq = (np.unique(comb_vec, return_counts=True)[1]/50).astype(int)
+    freq = (np.unique(comb_vec, return_counts=True)[1]).astype(int)//len(distlist)
     mean_vec = []
     for e in range(freq.shape[0]):
         mean_vec = np.append(mean_vec, np.full(freq[e],av[e]))

@@ -1,8 +1,43 @@
 import admin_functions as adfn
+import IS as isfn
+
 
 #PROCESS
 #------------
 #------------
+#=======================================================================
+def neighbour_new(coord, n_neigh, dim): # Select which fish data to visualise
+#=======================================================================
+    import numpy as np
+    import os
+    
+    #Loop through all fish
+    #----------------------
+        
+        # Set up nearest neighbour graph
+        #---------------------------------------------------------------------------
+    mcs  = np.multiply(coord, dim)     # metrically scaled coordinates (in microns)
+        
+        # Initialise full distance matrix and nearest neighbour graph (binary) matrix
+        #nearest neigh binary matrix of celln by celln storing 
+        #distance of each cell to every other cell
+        #---------------------------------------------------------------------------
+    nnb  = np.zeros((coord.shape[0],coord.shape[0]))  
+        
+    for r in range(coord.shape[0]):
+        distance = np.zeros(coord.shape[0])
+        if r % round((10*coord.shape[0]/100)) == 0: 
+            print("Doing row " + str(r) + " of " + str(coord.shape[0]))
+        
+        for x in range(coord.shape[0]):
+            if x == r: 
+                distance[x] = 100000
+            else:
+                distance[x] = np.linalg.norm(mcs[r]-mcs[x]) 
+                
+        index = np.argsort(distance)[:n_neigh]
+        nnb[r,index] = 1 #binary value defining whether in range or not 
+    return(nnb)
 
 #=======================================================================
 def neighbour_r(coord, cnt, rng, dim): # Select which fish data to visualise
@@ -36,13 +71,14 @@ def neighbour_r(coord, cnt, rng, dim): # Select which fish data to visualise
             # for each value of cell(r), each rr value (cell that is within range of cellr) 
             # a distance is calculated from cell to rrcell from their metrically scaled positions in space
             #------------------------------------------------------------------------------------
+        #CHANGE TO SELECTION OF N CLOSEST NEURONS - SAME N ACROSS FISH
         for rr in range(max([r-int(rng/2),0]), min([r+int(rng/2),distance.shape[1]])):  
-            if r == rr: distance[0,rr] = 10000  #set to 10000 ie value too large to be in range
+            if r == rr: distance[0,rr] = 10000  #cannot connect to itself - set to 10000 ie value too large to be in range 
             else:       distance[0,rr] = np.linalg.norm(mcs[r,:]-mcs[rr,:]) 
             
             #calculate binary matrix of all cells that are in range
             #--------------------------------------------------------------
-        mini = np.where(distance[0,:] < np.nanpercentile(distance[0,:],cnt))[0]
+        mini = np.where(distance[0,:] < np.nanpercentile(distance[0,:],cnt))[0] #THIS IS THROWN OFF BY ALL THE 10000S - JUST CONVERT TO SELECTING NUMBER OF NEURONS
         nnb[r,mini] = 1 #binary value defining whether in range or not 
     return(nnb)
 
@@ -595,3 +631,50 @@ def power_plot(data, data_inst, fig, units):
         ax3.annotate("C", annotate_coord, xycoords="axes fraction", fontproperties=panel_label_font)
 
     ax3.set_xlabel(units)
+    
+    
+def marglik_power_loglik(data, npart):
+    import numpy as np
+    #Size
+    sizes=data[0,:]
+    M=len(sizes)
+    a=min(sizes) #define xmin
+    b=max(sizes) #define xmax
+    size_ln=isfn.IS_LN(npart, sizes, M, a, b)
+    size_po=isfn.IS(npart, sizes, M, a, b)
+    
+    #Dur
+    sizes=data[1,:]
+    a=2 #define xmin
+    b=max(sizes) #define xmax
+    M=len(sizes[np.where(sizes>a-1)])
+    dur_ln=isfn.IS_LN(npart, sizes, M, a, b)
+    dur_po=isfn.IS(npart, sizes, M, a, b)
+    return(size_po, dur_po, size_ln, dur_ln)
+
+def DCC(av):
+    from matplotlib import pyplot as plt
+    import numpy as np
+    av_size = av[0]
+    av_dur = av[1]
+    ml = marglik_power_loglik(av, 2000)
+    size_e = ml[0][0]
+    dur_e = ml[1][0]
+    fig, axarr = plt.subplots(figsize = (7,5))
+    av_size = av_size
+    av_dur = (1/2.73)*av_dur
+
+    size_vec, dur_vec = [],[]
+    for e in np.unique(av_dur):
+        size_vec = np.append(size_vec, np.mean(av_size[np.where(av_dur == e)])) 
+        dur_vec = np.append(dur_vec, e)
+
+    xaxis = np.unique(dur_vec)
+    yaxis = size_vec
+    axarr.plot(xaxis[:len(xaxis)-1], yaxis[:len(xaxis)-1], '-', linewidth = 1.5, alpha = 1)
+    fit_beta,c = np.polyfit(np.log10(xaxis[:len(xaxis)-1]), np.log10(yaxis[:len(xaxis)-1]), 1)
+    plt.close(fig)
+    
+    pred_beta = (dur_e - 1)/(size_e - 1)
+    dcc = np.abs(fit_beta - pred_beta)
+    return(dcc)

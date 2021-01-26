@@ -524,13 +524,13 @@ class ba_netsim:
         [rows, cols]    = np.where(curr_mat == 1) 
         
         
-        full_distance = np.linspace(0, np.max(self.dist), 300)
-        sumto = np.sum(self.dist2edge(full_distance, divisor, soften, s, 0).edge_weight_out)
-        curr_sum = np.sum(self.dist2edge(full_distance, divisor, soften, s, r).edge_weight_out)
-        factor = sumto/curr_sum
+        #full_distance = np.linspace(0, np.max(self.dist), 300)
+        #sumto = np.sum(self.dist2edge(full_distance, divisor, soften, s, 0).edge_weight_out)
+        #curr_sum = np.sum(self.dist2edge(full_distance, divisor, soften, s, r).edge_weight_out)
+        #factor = sumto/curr_sum
         
         for e in range(len(rows)):
-            edge_weight = (self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out* factor)
+            edge_weight = (self.dist2edge(self.dist[rows[e], cols[e]], divisor, soften, s, r).edge_weight_out)#* factor)
             mat[rows[e], cols[e]] = edge_weight 
                 
         self.adj_mat = copy.deepcopy(mat)
@@ -575,7 +575,7 @@ class ba_netsim:
 
     #Ping node
     #===========================
-    def ping(self,  edge_density, r, s, divisor, soften, mode, n_sims, thresh, input_size):
+    def ping(self,  edge_density, r, s, divisor, soften, mode, n_sims, thresh, input_size, cutoff):
     #===========================
         import numpy as np
         curr_mat = self.adjmat_generate(edge_density, s, r,  divisor, soften, mode).adj_mat
@@ -611,8 +611,8 @@ class ba_netsim:
                     timesteps+=1
                     curr_list = tplus_nodes
 
-                    #if len(all_nodes) > cutoff:
-                    #    iterate = 'no'
+                    if timesteps == cutoff:
+                        iterate = 'no'
 
                     if len(tplus_nodes) == 0: #if no more active cells - stop
                         iterate = 'no'
@@ -703,17 +703,29 @@ def MSE(empirical, model, alpha): #Find the MSE between 2 distributions in log s
 
     plt.close(fig)
     diff_sq = (emp_yaxis - mod_yaxis)**2
-    end_index = np.where(diff_sq == float('inf'))[0][0]
-    diff_sq_full = diff_sq[:end_index]
-    MSE = np.sum(diff_sq_full)/ len(diff_sq_full)
 
-    res = emp_yaxis - mod_yaxis
-    res_full = res[:end_index]
-    var_res = np.sum((res_full - np.mean(res_full))**2)/len(res_full)
-    
-    empty_bins = bins - end_index
-    Beta = (empty_bins *(10**-5))
-    MSE_B = MSE + np.exp(Beta)*alpha
+    if len(np.where(diff_sq == float('inf'))[0]) > 0:
+        end_index = np.where(diff_sq == float('inf'))[0][0]
+        diff_sq_full = diff_sq[:end_index]
+        MSE = np.sum(diff_sq_full)/ len(diff_sq_full)
+
+        res = emp_yaxis - mod_yaxis
+        res_full = res[:end_index]
+        var_res = np.sum((res_full - np.mean(res_full))**2)/len(res_full)
+
+        empty_bins = bins - end_index
+        Beta = (empty_bins *(10**-5))
+        MSE_B = MSE + np.exp(Beta)*alpha
+
+    else:
+        MSE = np.sum(diff_sq)/ len(diff_sq)
+
+        res = emp_yaxis - mod_yaxis
+        var_res = np.sum((res - np.mean(res))**2)/len(res)
+
+        empty_bins = 0
+        Beta = (empty_bins *(10**-5))
+        MSE_B = MSE + np.exp(Beta)*alpha
     return(MSE_B, MSE, var_res)
 
 
@@ -768,3 +780,60 @@ def num_sims(empirical, cutoff):
     base = p
     exponent = int(math.log(number, base)) #number of simulations as the power to which p is raised to get 95% probability 
     return(exponent)
+
+
+
+
+def sub_sweep(data, const_list, val_list):
+    import numpy as np
+    if len(const_list) == 1:
+        par = const_list[0]
+        val = val_list[0]
+
+        if par == 'k':
+            index = 0
+        if par == 'v_th':
+            index = 1
+        if par == 'r':
+            index = 2
+
+        where = []
+        for i in range(len(data)):
+            if data[i][0][index] == val:
+                where = np.append(where, i)
+        where = where.astype(int)
+
+
+        output_list = list(range(len(where)))
+        for i in range(len(where)):
+            output_list[i] = data[where[i]]
+
+    if len(const_list) > 1:
+
+        where_list = list(range(len(const_list)))
+        for x in range(len(const_list)):
+            par = const_list[x]
+            val = val_list[x]
+
+            if par == 'k':
+                index = 0
+            if par == 'v_th':
+                index = 1
+            if par == 'r':
+                index = 2
+
+            where = []
+            for i in range(len(data)):
+                if data[i][0][index] == val:
+                    where = np.append(where, i)
+            where = where.astype(int)
+            where_list[x] = where
+        inter = np.intersect1d(where_list[0], where_list[1])
+
+        output_list = list(range(len(inter)))
+        for i in range(len(inter)):
+            output_list[i] = data[inter[i]]
+        
+    return(output_list)
+        
+    
