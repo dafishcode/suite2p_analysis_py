@@ -78,7 +78,6 @@ def fish_net_regrout(dat, fun = 'lin'):   # Remove slow drift components
         b, a   = signal.butter(5, nfc, 'high')
         alld   = signal.filtfilt(b,a, dat, axis=1,method='gust')
         
-    
     return alld
 
 
