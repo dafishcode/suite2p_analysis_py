@@ -3,10 +3,27 @@ import numpy as np
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+  
     
+#=================================================           
+def boxplot(dic, title, figshape, ylabelsize, xlabelsize, dot, cap):
+#====================================================
+    df = pd.DataFrame(dic)
+    df
+    sns.set_style("darkgrid")
+    fig, ax = plt.subplots(figsize = figshape)
+
+    ax = sns.stripplot(data=df, jitter=True, color="0", size = dot)
+    ax = sns.pointplot(data=df, linestyles = ['--'], color="#bb3f3f", size = 1, capsize = cap)
+    plt.ylabel(title, size = ylabelsize, color = 'black')
+    plt.xticks(np.arange(0, len(dic)), (dic), size = xlabelsize, color = 'black')
+    plt.yticks(color = 'black')
+    plt.show()
+    return(df)  
+
 
 #=================================================           
-def boxplot(Fdrop, experiment, plotlist, title):
+def ptz_boxplot(Fdrop, experiment, plotlist, title):
 #====================================================
     blnlist = list(range(np.int(len(plotlist)/3)))
     p5list = list(range(np.int(len(plotlist)/3)))
@@ -32,9 +49,10 @@ def boxplot(Fdrop, experiment, plotlist, title):
     plt.ylabel(title, size = 30, color = 'black')
     plt.xticks(np.arange(3), ('Baseline','PTZ 5mM', 'PTZ 20mM'), size = 15, color = 'black')
     plt.yticks(color = 'black')
-    plt.show()
-    sns.reset_orig()
-    plt.style.use('dark_background')
+    plt.savefig('branch.png')
+    #plt.show()
+    #sns.reset_orig()
+    #plt.style.use('dark_background')
     return(df)
 
 #=======================================================================
